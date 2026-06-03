@@ -7,7 +7,7 @@ const DB = {
 };
 
 export async function GET() {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const [rows]: any = await conn.execute(
       "SELECT * FROM Service WHERE active = 1 ORDER BY name ASC"
@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { name, price, duration, description } = await req.json();
     if (!name || !price) {
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { id, name, price, duration } = await req.json();
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");

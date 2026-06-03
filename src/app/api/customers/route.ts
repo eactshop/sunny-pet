@@ -7,7 +7,7 @@ const DB = {
 };
 
 export async function GET(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page") || 1);
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { name, phone, email, address } = await req.json();
     if (!name || !phone) {

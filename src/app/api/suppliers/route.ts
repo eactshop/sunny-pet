@@ -7,7 +7,7 @@ const DB = {
 };
 
 export async function GET() {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const [rows]: any = await conn.execute("SELECT * FROM Supplier ORDER BY name ASC");
     await conn.end();
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { name, phone, email, address } = await req.json();
     if (!name) { await conn.end(); return NextResponse.json({ success: false, error: "Thiếu tên NCC" }, { status: 400 }); }

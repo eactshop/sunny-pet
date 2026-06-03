@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/auth";
 
-const DB = { host: "localhost", port: 3306, user: "root", password: "", database: "sunny_pet" };
+import { getConnection, nowVN, genId } from "@/lib/db";
 
 async function checkOwner() {
   try {
@@ -15,7 +15,7 @@ async function checkOwner() {
 }
 
 export async function PATCH(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await getConnection();
   try {
     const { id } = await context.params;
     const { status } = await req.json();
@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, context: any) {
 }
 
 export async function PUT(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { id } = await context.params;
     const body = await req.json();
@@ -76,7 +76,7 @@ export async function PUT(req: NextRequest, context: any) {
 }
 
 export async function DELETE(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const user = await checkOwner();
     if (!user) { await conn.end(); return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 }); }

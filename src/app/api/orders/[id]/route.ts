@@ -15,7 +15,7 @@ async function getUser() {
 }
 
 export async function GET(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { id } = await context.params;
     const [rows]: any = await conn.execute(
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 export async function PATCH(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { id } = await context.params;
     const { status } = await req.json();
@@ -79,7 +79,7 @@ export async function PATCH(req: NextRequest, context: any) {
 }
 
 export async function DELETE(req: NextRequest, context: any) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     // Chỉ OWNER mới được xóa
     const user = await getUser();

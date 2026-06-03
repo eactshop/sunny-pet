@@ -11,7 +11,7 @@ const DB = {
 
 // GET /api/inventory
 export async function GET(req: NextRequest) {
-    const conn = await mysql.createConnection(DB);
+    const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
     try {
         const { searchParams } = new URL(req.url);
         const page = Number(searchParams.get("page") || 1);
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/inventory
 export async function POST(req: NextRequest) {
-    const conn = await mysql.createConnection(DB);
+    const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
     try {
         const body = await req.json();
         const { productId, supplierId, type, quantity, price, note } = body;

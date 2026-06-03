@@ -9,7 +9,7 @@ const DB = {
 
 // GET /api/settings
 export async function GET() {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const [users]: any = await conn.execute(
       "SELECT id, name, email, role, active, createdAt FROM User ORDER BY createdAt ASC"
@@ -24,7 +24,7 @@ export async function GET() {
 
 // POST /api/settings/users — thêm nhân viên
 export async function POST(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { name, email, password, role } = await req.json();
     if (!name || !email || !password) {
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH /api/settings — đổi mật khẩu hoặc toggle active
 export async function PATCH(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const body = await req.json();
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/settings?userId=xxx
 export async function DELETE(req: NextRequest) {
-  const conn = await mysql.createConnection(DB);
+  const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
