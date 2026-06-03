@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 
-const DB = {
-  host: "localhost", port: 3306,
-  user: "root", password: "", database: "sunny_pet",
-};
 
 export async function GET(req: NextRequest) {
   const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");

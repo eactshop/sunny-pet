@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 
-const DB = {
-  host: "localhost", port: 3306,
-  user: "root", password: "", database: "sunny_pet",
-};
-
 // GET /api/settings
 export async function GET() {
   const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
