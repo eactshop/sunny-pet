@@ -130,6 +130,10 @@ export default function OrdersPage() {
   const [customerTab, setCustomerTab] = useState<"existing" | "new">("existing");
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "" });
   const [productSearch, setProductSearch] = useState("");
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  const [voucherError, setVoucherError] = useState("");
+  const [voucherLoading, setVoucherLoading] = useState(false);
 
   const [showDetail, setShowDetail] = useState(false);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
@@ -167,6 +171,7 @@ export default function OrdersPage() {
     setSelectedCustomer(""); setCustomerSearch(""); setOrderItems([]);
     setDiscount("0"); setOrderNote(""); setPaymentMethod("CASH"); setCustomerTab("existing");
     setNewCustomer({ name: "", phone: "", address: "" }); setProductSearch("");
+    setVoucherCode(""); setAppliedVoucher(null); setVoucherError("");
     setShowCreate(true);
   };
 
@@ -178,6 +183,25 @@ export default function OrdersPage() {
     } else {
       setOrderItems(prev => [...prev, { productId: p.id, name: p.name, code: p.code, quantity: 1, price: p.sellPrice, stock: p.stock }]);
     }
+  };
+
+  const applyVoucher = async () => {
+    if (!voucherCode.trim()) return;
+    setVoucherLoading(true); setVoucherError("");
+    try {
+      const res = await fetch(`/api/store/vouchers/${voucherCode.trim().toUpperCase()}?total=${subtotal}`);
+      const data = await res.json();
+      if (data.success) {
+        setAppliedVoucher(data.data);
+        setDiscount(String(data.data.discountAmount));
+      } else {
+        setVoucherError(data.error || "Mã không hợp lệ");
+      }
+    } finally { setVoucherLoading(false); }
+  };
+
+  const removeVoucher = () => {
+    setAppliedVoucher(null); setVoucherCode(""); setVoucherError(""); setDiscount("0");
   };
 
   const subtotal = orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -198,7 +222,7 @@ export default function OrdersPage() {
       }
       const res = await fetch("/api/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, items: orderItems.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })), discount: Number(discount) || 0, note: orderNote, paymentMethod }),
+        body: JSON.stringify({ customerId, items: orderItems.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })), discount: Number(discount) || 0, note: orderNote, paymentMethod, promotionId: appliedVoucher?.id }),
       });
       const data = await res.json();
       if (data.success) {
@@ -502,13 +526,44 @@ export default function OrdersPage() {
                 </div>
                 {/* Summary */}
                 <div style={{ background: "#f9f9f9", borderRadius: 12, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13 }}>
                     <span style={{ color: "#666" }}>Tạm tính:</span><span style={{ fontWeight: 600 }}>{fmt(subtotal)}</span>
                   </div>
+
+                  {/* Voucher row */}
+                  <div style={{ marginBottom: 10 }}>
+                    {appliedVoucher ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#E8F5E9", border: "1px solid #A5D6A7", borderRadius: 8, padding: "7px 10px" }}>
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ fontWeight: 700, color: "#2E7D32" }}>🎫 {appliedVoucher.code}</span>
+                          <span style={{ color: "#388E3C", marginLeft: 6 }}>-{fmt(appliedVoucher.discountAmount)}</span>
+                        </div>
+                        <button onClick={removeVoucher} style={{ background: "none", border: "none", cursor: "pointer", color: "#B71C1C", fontSize: 16, lineHeight: 1 }}>✕</button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <input
+                            value={voucherCode}
+                            onChange={e => { setVoucherCode(e.target.value.toUpperCase()); setVoucherError(""); }}
+                            onKeyDown={e => e.key === "Enter" && applyVoucher()}
+                            placeholder="Nhập mã voucher..."
+                            style={{ flex: 1, padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, fontSize: 13, outline: "none" }}
+                          />
+                          <button onClick={applyVoucher} disabled={voucherLoading || !voucherCode.trim()}
+                            style={{ padding: "6px 12px", background: voucherLoading || !voucherCode.trim() ? "#ccc" : "#F4B400", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: voucherLoading || !voucherCode.trim() ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
+                            {voucherLoading ? "..." : "Áp dụng"}
+                          </button>
+                        </div>
+                        {voucherError && <div style={{ color: "#B71C1C", fontSize: 11, marginTop: 4 }}>❌ {voucherError}</div>}
+                      </div>
+                    )}
+                  </div>
+
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13 }}>
-                    <span style={{ color: "#666" }}>Giảm giá:</span>
+                    <span style={{ color: "#666" }}>Giảm giá thêm:</span>
                     <input type="number" value={discount} onChange={e => setDiscount(e.target.value)}
-                      style={{ width: 100, padding: "4px 8px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, textAlign: "right" }} />
+                      style={{ width: 90, padding: "4px 8px", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, textAlign: "right" }} />
                   </div>
                   <div style={{ borderTop: "1px solid #e8e8e8", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 16 }}>
                     <span style={{ fontWeight: 700 }}>Tổng cộng:</span>
