@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
     const id = genId();
     const now = nowVN();
     await conn.execute(
-      `INSERT INTO Promotion (id, code, name, type, value, minOrder, maxDiscount, maxUses, startDate, endDate, active, usedCount, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)`,
+      `INSERT INTO Promotion (id, code, name, type, value, minOrder, maxDiscount, maxUses, startDate, endDate, active, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       [id, code.toUpperCase(), name, type, Number(value), Number(minOrder) || null, Number(maxDiscount) || null, Number(maxUses) || null,
        startDate, endDate, now, now]
     );
