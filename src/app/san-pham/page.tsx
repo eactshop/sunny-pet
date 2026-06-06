@@ -4,7 +4,7 @@ import Footer from "@/components/store/Footer";
 import ProductCard from "@/components/store/ProductCard";
 import Providers from "@/components/store/Providers";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SlidersHorizontal, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -217,7 +217,9 @@ export default function ProductsPage() {
               <p className="text-gray-500 text-sm mt-1">Khám phá đầy đủ sản phẩm cho thú cưng của bạn</p>
             </div>
           </div>
-          <ProductsContent />
+          <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#F4B400] border-t-transparent rounded-full animate-spin" /></div>}>
+            <ProductsContent />
+          </Suspense>
         </main>
         <Footer />
       </div>
