@@ -103,6 +103,18 @@ CREATE TABLE IF NOT EXISTS Promotion (
   updatedAt DATETIME NOT NULL
 );
 
+-- Create Banner table for homepage carousel
+CREATE TABLE IF NOT EXISTS Banner (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  imageUrl VARCHAR(500) NOT NULL,
+  title VARCHAR(255) NULL,
+  link VARCHAR(500) NULL,
+  `order` INT DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  createdAt DATETIME NOT NULL,
+  updatedAt DATETIME NOT NULL
+);
+
 -- Update existing data defaults
 UPDATE `Order` SET orderSource = 'CRM' WHERE orderSource IS NULL;
 UPDATE Customer SET source = 'CRM' WHERE source IS NULL;

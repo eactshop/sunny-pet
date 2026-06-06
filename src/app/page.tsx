@@ -2,9 +2,26 @@ import Header from "@/components/store/Header";
 import Footer from "@/components/store/Footer";
 import ProductCard from "@/components/store/ProductCard";
 import Providers from "@/components/store/Providers";
+import BannerCarousel from "@/components/store/BannerCarousel";
 import { getProducts, getCategories } from "@/services/crm.service";
 import Link from "next/link";
 import { ChevronRight, Truck, Shield, RotateCcw, HeadphonesIcon } from "lucide-react";
+import mysql from "mysql2/promise";
+
+async function getBanners() {
+  try {
+    const conn = await mysql.createConnection(
+      process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet"
+    );
+    const [rows]: any = await conn.execute(
+      "SELECT * FROM Banner WHERE active = 1 ORDER BY `order` ASC, createdAt ASC"
+    );
+    await conn.end();
+    return rows as any[];
+  } catch {
+    return [];
+  }
+}
 
 const HERO_CATEGORIES = [
   { name: "Thức ăn chó", icon: "🐕", slug: "thuc-an-cho", color: "bg-yellow-50" },
@@ -17,9 +34,10 @@ const HERO_CATEGORIES = [
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [productsData, categories] = await Promise.all([
+  const [productsData, categories, banners] = await Promise.all([
     getProducts({ limit: 8 }),
     getCategories(),
+    getBanners(),
   ]);
 
   return (
@@ -28,36 +46,34 @@ export default async function HomePage() {
         <Header />
         <main className="flex-1">
           {/* Hero Banner */}
-          <section className="bg-gradient-to-r from-[#F4B400] to-[#FFD54F] text-white">
-            <div className="max-w-7xl mx-auto px-4 py-12 md:py-20">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex-1 text-center md:text-left">
-                  <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
-                    Yêu thú cưng<br />
-                    <span className="text-white/90">theo cách tốt nhất</span>
-                  </h1>
-                  <p className="text-lg text-yellow-100 mb-8 max-w-md">
-                    Sản phẩm chất lượng cao cho thú cưng yêu của bạn. Giao hàng tận nơi, đổi trả dễ dàng.
-                  </p>
-                  <div className="flex gap-4 justify-center md:justify-start">
-                    <Link
-                      href="/san-pham"
-                      className="bg-white text-[#F4B400] font-semibold px-8 py-3 rounded-full hover:bg-yellow-50 transition-colors shadow-lg"
-                    >
-                      Mua ngay
-                    </Link>
-                    <Link
-                      href="/san-pham"
-                      className="border-2 border-white text-white font-semibold px-8 py-3 rounded-full hover:bg-white/10 transition-colors"
-                    >
-                      Xem sản phẩm
-                    </Link>
+          {banners.length > 0 ? (
+            <BannerCarousel banners={banners} />
+          ) : (
+            <section className="bg-gradient-to-r from-[#F4B400] to-[#FFD54F] text-white">
+              <div className="max-w-7xl mx-auto px-4 py-12 md:py-20">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="flex-1 text-center md:text-left">
+                    <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
+                      Yêu thú cưng<br />
+                      <span className="text-white/90">theo cách tốt nhất</span>
+                    </h1>
+                    <p className="text-lg text-yellow-100 mb-8 max-w-md">
+                      Sản phẩm chất lượng cao cho thú cưng yêu của bạn. Giao hàng tận nơi, đổi trả dễ dàng.
+                    </p>
+                    <div className="flex gap-4 justify-center md:justify-start">
+                      <Link href="/san-pham" className="bg-white text-[#F4B400] font-semibold px-8 py-3 rounded-full hover:bg-yellow-50 transition-colors shadow-lg">
+                        Mua ngay
+                      </Link>
+                      <Link href="/san-pham" className="border-2 border-white text-white font-semibold px-8 py-3 rounded-full hover:bg-white/10 transition-colors">
+                        Xem sản phẩm
+                      </Link>
+                    </div>
                   </div>
+                  <div className="text-8xl md:text-[10rem] select-none">🐾</div>
                 </div>
-                <div className="text-8xl md:text-[10rem] select-none">🐾</div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Features bar */}
           <section className="bg-white border-b">

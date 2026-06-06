@@ -1,6 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+
+interface Banner {
+  id: string; imageUrl: string; title?: string; link?: string; order: number; active: boolean;
+}
 
 interface User {
   id: string; name: string; email: string;
@@ -37,11 +41,93 @@ export default function SettingsPage() {
   // Current user (from cookie/session - simplified)
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Banner state
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannerLoading, setBannerLoading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerForm, setBannerForm] = useState({ imageUrl: "", title: "", link: "", order: "0", active: true });
+  const [showAddBanner, setShowAddBanner] = useState(false);
+  const [editBanner, setEditBanner] = useState<Banner | null>(null);
+  const bannerFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    // Get current user from API
     fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.success) setCurrentUser(d.data); });
     fetchUsers();
+    fetchBanners();
   }, []);
+
+  const fetchBanners = async () => {
+    setBannerLoading(true);
+    try {
+      const res = await fetch("/api/banners?all=1");
+      const data = await res.json();
+      if (data.success) setBanners(data.data);
+    } finally { setBannerLoading(false); }
+  };
+
+  const handleBannerUpload = async (file: File) => {
+    setBannerUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) {
+        if (editBanner) setEditBanner({ ...editBanner, imageUrl: data.url });
+        else setBannerForm(f => ({ ...f, imageUrl: data.url }));
+      } else showMsg("Upload ảnh thất bại: " + data.error, "error");
+    } finally { setBannerUploading(false); }
+  };
+
+  const handleAddBanner = async () => {
+    if (!bannerForm.imageUrl) { showMsg("Vui lòng chọn ảnh banner!", "error"); return; }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/banners", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...bannerForm, order: Number(bannerForm.order) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showMsg("✅ Đã thêm banner!");
+        setShowAddBanner(false);
+        setBannerForm({ imageUrl: "", title: "", link: "", order: "0", active: true });
+        fetchBanners();
+      } else showMsg(data.error, "error");
+    } finally { setSaving(false); }
+  };
+
+  const handleUpdateBanner = async () => {
+    if (!editBanner || !editBanner.imageUrl) { showMsg("Vui lòng chọn ảnh!", "error"); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/banners/${editBanner.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editBanner),
+      });
+      const data = await res.json();
+      if (data.success) { showMsg("✅ Đã cập nhật banner!"); setEditBanner(null); fetchBanners(); }
+      else showMsg(data.error, "error");
+    } finally { setSaving(false); }
+  };
+
+  const handleToggleBanner = async (b: Banner) => {
+    const res = await fetch(`/api/banners/${b.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...b, active: !b.active }),
+    });
+    const data = await res.json();
+    if (data.success) { showMsg(b.active ? "✅ Đã ẩn banner" : "✅ Đã hiện banner"); fetchBanners(); }
+    else showMsg(data.error, "error");
+  };
+
+  const handleDeleteBanner = async (b: Banner) => {
+    if (!confirm(`Xóa banner "${b.title || b.imageUrl}"?`)) return;
+    const res = await fetch(`/api/banners/${b.id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) { showMsg("✅ Đã xóa banner!"); fetchBanners(); }
+    else showMsg(data.error, "error");
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -145,6 +231,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { key: "users",    icon: "👤", label: "Tài khoản & Phân quyền" },
+    { key: "banner",   icon: "🖼️", label: "Banner trang chủ" },
     { key: "security", icon: "🔒", label: "Bảo mật" },
     { key: "about",    icon: "ℹ️",  label: "Thông tin hệ thống" },
   ];
@@ -263,6 +350,74 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* BANNER TAB */}
+          {tab === "banner" && (
+            <div style={{ background: "#fff", borderRadius: 16, padding: 28, boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>🖼️ Banner trang chủ</h2>
+                  <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>Ảnh sẽ hiển thị dạng carousel trên trang chủ cửa hàng</p>
+                </div>
+                <button onClick={() => { setBannerForm({ imageUrl: "", title: "", link: "", order: String(banners.length), active: true }); setShowAddBanner(true); }}
+                  style={{ background: "#F4B400", color: "#fff", border: "none", padding: "9px 18px", borderRadius: 10, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+                  ＋ Thêm banner
+                </button>
+              </div>
+
+              {bannerLoading ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#888" }}>⏳ Đang tải...</div>
+              ) : banners.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#aaa", border: "2px dashed #eee", borderRadius: 14 }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🖼️</div>
+                  <p>Chưa có banner nào. Thêm ảnh để hiển thị trên trang chủ.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {banners.map((b, idx) => (
+                    <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: "1.5px solid #f0f0f0", borderRadius: 14, opacity: b.active ? 1 : 0.55 }}>
+                      {/* Thumbnail */}
+                      <div style={{ width: 100, height: 60, borderRadius: 10, overflow: "hidden", flexShrink: 0, background: "#f5f5f5" }}>
+                        <img src={b.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      </div>
+                      {/* Info */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{b.title || <span style={{ color: "#aaa" }}>Chưa có tiêu đề</span>}</div>
+                        {b.link && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>🔗 {b.link}</div>}
+                        <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>Thứ tự: {b.order}</div>
+                      </div>
+                      {/* Status */}
+                      <span style={{ background: b.active ? "#E8F5E9" : "#f5f5f5", color: b.active ? "#2E7D32" : "#888", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
+                        {b.active ? "Hiển thị" : "Ẩn"}
+                      </span>
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => setEditBanner({ ...b })}
+                          style={{ background: "#E3F2FD", color: "#1565C0", border: "none", padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 11 }}>
+                          ✏️ Sửa
+                        </button>
+                        <button onClick={() => handleToggleBanner(b)}
+                          style={{ background: b.active ? "#FFF8E1" : "#E8F5E9", color: b.active ? "#F57F17" : "#2E7D32", border: "none", padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 11 }}>
+                          {b.active ? "🙈 Ẩn" : "👁️ Hiện"}
+                        </button>
+                        <button onClick={() => handleDeleteBanner(b)}
+                          style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "6px 10px", borderRadius: 8, cursor: "pointer", fontSize: 11 }}>
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Preview note */}
+              {banners.length > 0 && (
+                <div style={{ marginTop: 16, background: "#FFF8E1", borderRadius: 10, padding: "12px 16px", fontSize: 12, color: "#888" }}>
+                  💡 Trang chủ cập nhật ảnh sau tối đa 60 giây. Thứ tự hiển thị theo cột "Thứ tự" (nhỏ hơn = trước).
+                </div>
+              )}
             </div>
           )}
 
@@ -385,6 +540,126 @@ export default function SettingsPage() {
                 <button onClick={handleAddUser} disabled={saving}
                   style={{ flex: 1, padding: "12px", background: saving ? "#ccc" : "#F4B400", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
                   {saving ? "⏳..." : "💾 Thêm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD BANNER MODAL */}
+      {showAddBanner && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 32, width: isMobile ? "100%" : 480, maxHeight: "92vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🖼️ Thêm banner mới</h2>
+              <button onClick={() => setShowAddBanner(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Image upload */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
+                <div
+                  onClick={() => bannerFileRef.current?.click()}
+                  style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, position: "relative", overflow: "hidden" }}>
+                  {bannerForm.imageUrl ? (
+                    <img src={bannerForm.imageUrl} alt="" style={{ maxHeight: 160, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
+                  ) : bannerUploading ? (
+                    <div style={{ color: "#F4B400" }}>⏳ Đang tải ảnh...</div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 32 }}>📤</div>
+                      <div style={{ fontSize: 13, color: "#888" }}>Click để chọn ảnh banner</div>
+                      <div style={{ fontSize: 11, color: "#aaa" }}>Khuyến nghị: 1200×400px hoặc tỷ lệ 3:1</div>
+                    </>
+                  )}
+                </div>
+                <input ref={bannerFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+              </div>
+              {/* Title */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Tiêu đề (không bắt buộc)</label>
+                <input type="text" value={bannerForm.title} onChange={e => setBannerForm(f => ({ ...f, title: e.target.value }))} placeholder="VD: Khuyến mãi tháng 6"
+                  style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Link */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Liên kết khi click (không bắt buộc)</label>
+                <input type="text" value={bannerForm.link} onChange={e => setBannerForm(f => ({ ...f, link: e.target.value }))} placeholder="VD: /san-pham?categoryId=abc"
+                  style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Order */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Thứ tự hiển thị</label>
+                <input type="number" value={bannerForm.order} onChange={e => setBannerForm(f => ({ ...f, order: e.target.value }))} min="0"
+                  style={{ width: 120, padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none" }} />
+              </div>
+              {/* Active */}
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={bannerForm.active} onChange={e => setBannerForm(f => ({ ...f, active: e.target.checked }))} style={{ width: 18, height: 18, accentColor: "#F4B400" }} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Hiển thị ngay trên trang chủ</span>
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button onClick={() => setShowAddBanner(false)} style={{ flex: 1, padding: 12, background: "#f5f5f5", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Hủy</button>
+                <button onClick={handleAddBanner} disabled={saving || bannerUploading}
+                  style={{ flex: 1, padding: 12, background: saving ? "#ccc" : "#F4B400", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+                  {saving ? "⏳..." : "💾 Thêm banner"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT BANNER MODAL */}
+      {editBanner && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 32, width: isMobile ? "100%" : 480, maxHeight: "92vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>✏️ Sửa banner</h2>
+              <button onClick={() => setEditBanner(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
+                <div onClick={() => bannerFileRef.current?.click()}
+                  style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+                  {editBanner.imageUrl ? (
+                    <img src={editBanner.imageUrl} alt="" style={{ maxHeight: 140, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
+                  ) : bannerUploading ? (
+                    <div style={{ color: "#F4B400" }}>⏳ Đang tải...</div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#888" }}>📤 Click để đổi ảnh</div>
+                  )}
+                </div>
+                <input ref={bannerFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Tiêu đề</label>
+                <input type="text" value={editBanner.title || ""} onChange={e => setEditBanner(b => b ? { ...b, title: e.target.value } : b)} placeholder="VD: Khuyến mãi tháng 6"
+                  style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Liên kết khi click</label>
+                <input type="text" value={editBanner.link || ""} onChange={e => setEditBanner(b => b ? { ...b, link: e.target.value } : b)} placeholder="/san-pham"
+                  style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Thứ tự</label>
+                <input type="number" value={editBanner.order} onChange={e => setEditBanner(b => b ? { ...b, order: Number(e.target.value) } : b)} min="0"
+                  style={{ width: 120, padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none" }} />
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={editBanner.active} onChange={e => setEditBanner(b => b ? { ...b, active: e.target.checked } : b)} style={{ width: 18, height: 18, accentColor: "#F4B400" }} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Hiển thị trên trang chủ</span>
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button onClick={() => setEditBanner(null)} style={{ flex: 1, padding: 12, background: "#f5f5f5", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Hủy</button>
+                <button onClick={handleUpdateBanner} disabled={saving || bannerUploading}
+                  style={{ flex: 1, padding: 12, background: saving ? "#ccc" : "#F4B400", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+                  {saving ? "⏳..." : "💾 Lưu thay đổi"}
                 </button>
               </div>
             </div>
