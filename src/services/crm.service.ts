@@ -288,13 +288,12 @@ export async function getOrderById(orderId: string) {
 export async function validateVoucher(code: string, orderTotal: number) {
   const conn = await getConn();
   try {
-    const now = nowVN();
     const [rows]: any = await conn.execute(
       `SELECT p.*,
         (SELECT COUNT(*) FROM \`Order\` o WHERE o.promotionId = p.id) as usedCount
        FROM Promotion p WHERE p.code = ? AND p.active = 1
-       AND p.startDate <= ? AND p.endDate >= ?`,
-      [code, now, now]
+       AND p.startDate <= NOW() AND p.endDate >= NOW()`,
+      [code]
     );
     if (!rows.length) return null;
     const promo = rows[0];
