@@ -26,9 +26,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     .slice(0, 4);
 
   const isOutOfStock = product.stock <= 0;
-  const hasDiscount = product.salePrice && product.salePrice > 0 && product.salePrice < product.sellPrice;
-  const displayPrice = hasDiscount ? product.salePrice! : product.sellPrice;
-  const discountPct = hasDiscount ? Math.round((1 - product.salePrice! / product.sellPrice) * 100) : 0;
+  const salePrice = Number(product.salePrice);
+  const sellPrice = Number(product.sellPrice);
+  const hasDiscount = salePrice > 0 && salePrice < sellPrice;
+  const displayPrice = hasDiscount ? salePrice : sellPrice;
+  const discountPct = hasDiscount ? Math.round((1 - salePrice / sellPrice) * 100) : 0;
 
   return (
     <Providers>
@@ -84,7 +86,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                       {hasDiscount && (
                         <>
                           <span className="text-lg text-gray-400 line-through">
-                            {product.sellPrice.toLocaleString("vi-VN")}₫
+                            {sellPrice.toLocaleString("vi-VN")}₫
                           </span>
                           <span className="bg-red-500 text-white text-sm font-bold px-2.5 py-1 rounded-lg">
                             -{discountPct}%
@@ -94,7 +96,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                     </div>
                     {hasDiscount && (
                       <p className="text-sm text-red-500 font-medium mt-1">
-                        Tiết kiệm {(product.sellPrice - displayPrice).toLocaleString("vi-VN")}₫
+                        Tiết kiệm {(sellPrice - displayPrice).toLocaleString("vi-VN")}₫
                       </p>
                     )}
                   </div>
