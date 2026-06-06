@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannerLoading, setBannerLoading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
+  const [bannerUploadError, setBannerUploadError] = useState("");
   const [bannerForm, setBannerForm] = useState({ imageUrl: "", title: "", link: "", order: "0", active: true });
   const [showAddBanner, setShowAddBanner] = useState(false);
   const [editBanner, setEditBanner] = useState<Banner | null>(null);
@@ -66,15 +67,20 @@ export default function SettingsPage() {
 
   const handleBannerUpload = async (file: File) => {
     setBannerUploading(true);
+    setBannerUploadError("");
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (data.success) {
-        if (editBanner) setEditBanner({ ...editBanner, imageUrl: data.url });
+        if (editBanner) setEditBanner(b => b ? { ...b, imageUrl: data.url } : b);
         else setBannerForm(f => ({ ...f, imageUrl: data.url }));
-      } else showMsg("Upload ảnh thất bại: " + data.error, "error");
+      } else {
+        setBannerUploadError(data.error || "Upload thất bại");
+      }
+    } catch (err: any) {
+      setBannerUploadError(err.message || "Lỗi kết nối");
     } finally { setBannerUploading(false); }
   };
 
@@ -558,21 +564,23 @@ export default function SettingsPage() {
               {/* Image upload */}
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
-                <label htmlFor="banner-file-add" style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+                <div style={{ position: "relative", border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
                   {bannerForm.imageUrl ? (
-                    <img src={bannerForm.imageUrl} alt="" style={{ maxHeight: 160, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
+                    <img src={bannerForm.imageUrl} alt="" style={{ maxHeight: 160, maxWidth: "100%", borderRadius: 8, objectFit: "contain", pointerEvents: "none" }} />
                   ) : bannerUploading ? (
-                    <div style={{ color: "#F4B400" }}>⏳ Đang tải ảnh...</div>
+                    <div style={{ color: "#F4B400", pointerEvents: "none" }}>⏳ Đang tải ảnh...</div>
                   ) : (
-                    <>
+                    <div style={{ pointerEvents: "none" }}>
                       <div style={{ fontSize: 32 }}>📤</div>
                       <div style={{ fontSize: 13, color: "#888" }}>Click để chọn ảnh banner</div>
                       <div style={{ fontSize: 11, color: "#aaa" }}>Khuyến nghị: 1200×400px hoặc tỷ lệ 3:1</div>
-                    </>
+                    </div>
                   )}
-                </label>
-                <input id="banner-file-add" type="file" accept="image/*" style={{ display: "none" }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+                  <input type="file" accept="image/*"
+                    style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+                </div>
+                {bannerUploadError && <div style={{ color: "#B71C1C", fontSize: 12, marginTop: 6 }}>⚠️ {bannerUploadError}</div>}
               </div>
               {/* Title */}
               <div>
@@ -620,17 +628,19 @@ export default function SettingsPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
-                <label htmlFor="banner-file-edit" style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+                <div style={{ position: "relative", border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
                   {editBanner.imageUrl ? (
-                    <img src={editBanner.imageUrl} alt="" style={{ maxHeight: 140, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
+                    <img src={editBanner.imageUrl} alt="" style={{ maxHeight: 140, maxWidth: "100%", borderRadius: 8, objectFit: "contain", pointerEvents: "none" }} />
                   ) : bannerUploading ? (
-                    <div style={{ color: "#F4B400" }}>⏳ Đang tải...</div>
+                    <div style={{ color: "#F4B400", pointerEvents: "none" }}>⏳ Đang tải...</div>
                   ) : (
-                    <div style={{ fontSize: 13, color: "#888" }}>📤 Click để đổi ảnh</div>
+                    <div style={{ fontSize: 13, color: "#888", pointerEvents: "none" }}>📤 Click để đổi ảnh</div>
                   )}
-                </label>
-                <input id="banner-file-edit" type="file" accept="image/*" style={{ display: "none" }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+                  <input type="file" accept="image/*"
+                    style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
+                </div>
+                {bannerUploadError && <div style={{ color: "#B71C1C", fontSize: 12, marginTop: 6 }}>⚠️ {bannerUploadError}</div>}
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Tiêu đề</label>
