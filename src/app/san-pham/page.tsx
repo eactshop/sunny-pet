@@ -40,6 +40,7 @@ function ProductsContent() {
       const params = new URLSearchParams({
         page: String(page),
         limit: "24",
+        sort,
         ...(search && { search }),
         ...(categoryId && { categoryId }),
       });

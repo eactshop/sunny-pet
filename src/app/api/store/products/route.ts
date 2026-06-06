@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
       limit: Number(searchParams.get("limit") || 24),
       search: searchParams.get("search") || undefined,
       categoryId: searchParams.get("categoryId") || undefined,
+      sort: searchParams.get("sort") || "newest",
     });
     return NextResponse.json({ success: true, data: result });
   } catch (e: any) {

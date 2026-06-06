@@ -37,6 +37,7 @@ export async function getProducts(params: {
   limit?: number;
   search?: string;
   categoryId?: string;
+  sort?: string;
 }) {
   const conn = await getConn();
   try {
@@ -55,11 +56,16 @@ export async function getProducts(params: {
       args.push(params.categoryId);
     }
 
+    const orderBy =
+      params.sort === "price_asc" ? "COALESCE(p.salePrice, p.sellPrice) ASC" :
+      params.sort === "price_desc" ? "COALESCE(p.salePrice, p.sellPrice) DESC" :
+      "p.createdAt DESC";
+
     const [items]: any = await conn.execute(
       `SELECT p.id, p.code, p.name, p.description, p.sellPrice, p.salePrice, p.stock, p.image,
               p.categoryId, p.active, c.name as categoryName
        FROM Product p LEFT JOIN Category c ON p.categoryId = c.id
-       ${where} ORDER BY p.createdAt DESC LIMIT ${limit} OFFSET ${offset}`,
+       ${where} ORDER BY ${orderBy} LIMIT ${limit} OFFSET ${offset}`,
       args
     );
 
