@@ -36,7 +36,7 @@ export default function BannerCarousel({ banners }: Props) {
       onMouseLeave={() => setPaused(false)}
     >
       {/* Slides */}
-      <div className="relative h-[570px]">
+      <div className="relative h-[200px] sm:h-[340px] md:h-[450px] lg:h-[570px]">
         {banners.map((b, i) => (
           <div
             key={b.id}
