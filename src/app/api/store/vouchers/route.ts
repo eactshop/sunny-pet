@@ -10,17 +10,15 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const total = Number(searchParams.get("total") || 0);
-    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
     const [rows]: any = await conn.execute(
       `SELECT p.*,
         (SELECT COUNT(*) FROM \`Order\` o WHERE o.promotionId = p.id) as usedCount
        FROM Promotion p
        WHERE p.active = 1
-         AND p.startDate <= ?
-         AND p.endDate >= ?
-       ORDER BY p.value DESC`,
-      [now, now]
+         AND p.startDate <= NOW()
+         AND p.endDate >= NOW()
+       ORDER BY p.value DESC`
     );
     await conn.end();
 
