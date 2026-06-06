@@ -129,6 +129,7 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [customerTab, setCustomerTab] = useState<"existing" | "new">("existing");
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "" });
+  const [productSearch, setProductSearch] = useState("");
 
   const [showDetail, setShowDetail] = useState(false);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
@@ -165,7 +166,7 @@ export default function OrdersPage() {
     await fetchProducts();
     setSelectedCustomer(""); setCustomerSearch(""); setOrderItems([]);
     setDiscount("0"); setOrderNote(""); setPaymentMethod("CASH"); setCustomerTab("existing");
-    setNewCustomer({ name: "", phone: "", address: "" });
+    setNewCustomer({ name: "", phone: "", address: "" }); setProductSearch("");
     setShowCreate(true);
   };
 
@@ -432,8 +433,18 @@ export default function OrdersPage() {
                 {/* Products list */}
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Chọn sản phẩm</label>
+                  <input
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    placeholder="🔍 Tìm tên hoặc mã sản phẩm..."
+                    style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
+                  />
                   <div style={{ maxHeight: 220, overflowY: "auto", border: "1.5px solid #e8e8e8", borderRadius: 10 }}>
-                    {products.map(p => (
+                    {products.filter(p =>
+                      !productSearch ||
+                      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      p.code.toLowerCase().includes(productSearch.toLowerCase())
+                    ).map(p => (
                       <div key={p.id} onClick={() => addProduct(p)}
                         style={{ padding: "8px 12px", cursor: p.stock > 0 ? "pointer" : "not-allowed", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f5f5f5", opacity: p.stock === 0 ? 0.4 : 1 }}
                         onMouseEnter={e => { if (p.stock > 0) e.currentTarget.style.background = "#f9f9f9"; }}
@@ -448,6 +459,13 @@ export default function OrdersPage() {
                         </div>
                       </div>
                     ))}
+                    {products.filter(p =>
+                      !productSearch ||
+                      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      p.code.toLowerCase().includes(productSearch.toLowerCase())
+                    ).length === 0 && (
+                      <div style={{ padding: "16px 12px", textAlign: "center", color: "#aaa", fontSize: 13 }}>Không tìm thấy sản phẩm</div>
+                    )}
                   </div>
                 </div>
               </div>
