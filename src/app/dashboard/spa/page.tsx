@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ";
 
@@ -19,15 +20,22 @@ const STATUS_FLOW: Record<string, string[]> = {
 
 interface Appointment {
   id: string; status: string; date: string; note?: string; price: number;
+  paymentMethod?: string;
   customerName: string; customerPhone: string;
   petName: string; petSpecies: string; petBreed?: string;
   serviceName: string; serviceDuration: number;
 }
+
+const PM_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  CASH:          { label: "Tiền mặt",     icon: "💵", color: "#2E7D32", bg: "#E8F5E9" },
+  BANK_TRANSFER: { label: "Chuyển khoản", icon: "🏦", color: "#1565C0", bg: "#E3F2FD" },
+};
 interface Customer { id: string; name: string; phone: string; }
 interface Pet { id: string; name: string; species: string; breed?: string; customerId: string; }
 interface Service { id: string; name: string; price: number; duration: number; }
 
 export default function SpaPage() {
+  const isMobile = useIsMobile();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -51,6 +59,7 @@ export default function SpaPage() {
     customerId: "", petId: "", serviceId: "",
     date: "", time: "09:00", note: "", price: "",
   });
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK_TRANSFER">("CASH");
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -99,6 +108,7 @@ export default function SpaPage() {
     await fetchPets();
     const today = new Date().toISOString().slice(0, 10);
     setForm({ customerId: "", petId: "", serviceId: "", date: today, time: "09:00", note: "", price: "" });
+    setPaymentMethod("CASH");
     setFilteredPets([]);
     setShowForm(true);
   };
@@ -130,6 +140,7 @@ export default function SpaPage() {
         note: a.note || "",
         price: String(a.price),
       });
+      setPaymentMethod((a.paymentMethod as "CASH" | "BANK_TRANSFER") || "CASH");
     }
     setShowForm(true);
   };
@@ -148,6 +159,7 @@ export default function SpaPage() {
         date: dateTime,
         note: form.note,
         price: Number(form.price) || 0,
+        paymentMethod,
       };
 
       const url = editAppointment ? `/api/appointments/${editAppointment.id}` : "/api/appointments";
@@ -273,7 +285,7 @@ export default function SpaPage() {
                 const dateObj = new Date(a.date);
                 const nextStatuses = STATUS_FLOW[a.status] || [];
                 return (
-                  <div key={a.id} style={{ background: "#fff", borderRadius: 16, padding: "18px 22px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", display: "flex", alignItems: "center", gap: 16 }}>
+                  <div key={a.id} style={{ background: "#fff", borderRadius: 16, padding: isMobile ? "14px 14px" : "18px 22px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", display: "flex", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 10 : 16, flexWrap: isMobile ? "wrap" : "nowrap" }}>
                     <div style={{ width: 4, height: 64, borderRadius: 4, background: s.bar, flexShrink: 0 }} />
                     {/* Time */}
                     <div style={{ width: 70, textAlign: "center", flexShrink: 0 }}>
@@ -299,7 +311,8 @@ export default function SpaPage() {
                     </div>
                     {/* Price & Status */}
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#4CAF50", marginBottom: 6 }}>{fmt(a.price)}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#4CAF50", marginBottom: 4 }}>{fmt(a.price)}</div>
+                      {a.paymentMethod && <span style={{ background: PM_MAP[a.paymentMethod]?.bg, color: PM_MAP[a.paymentMethod]?.color, padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, display: "inline-block", marginBottom: 4 }}>{PM_MAP[a.paymentMethod]?.icon} {PM_MAP[a.paymentMethod]?.label}</span>}
                       <span style={{ background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{s.label}</span>
                     </div>
                     {/* Actions */}
@@ -355,8 +368,8 @@ export default function SpaPage() {
 
       {/* BOOKING FORM MODAL */}
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 32, width: 500, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 32, width: isMobile ? "100%" : 500, maxHeight: "92vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{editAppointment ? "✏️ Sửa lịch hẹn" : "📅 Đặt lịch spa"}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
@@ -418,6 +431,19 @@ export default function SpaPage() {
                   style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
               </div>
 
+              {/* Payment Method */}
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>💳 Hình thức thanh toán</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(["CASH", "BANK_TRANSFER"] as const).map(pm => (
+                    <button key={pm} onClick={() => setPaymentMethod(pm)}
+                      style={{ flex: 1, padding: "10px 8px", borderRadius: 10, border: `2px solid ${paymentMethod === pm ? PM_MAP[pm].color : "#e8e8e8"}`, background: paymentMethod === pm ? PM_MAP[pm].bg : "#fff", color: paymentMethod === pm ? PM_MAP[pm].color : "#888", fontWeight: paymentMethod === pm ? 700 : 400, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.15s" }}>
+                      <span>{PM_MAP[pm].icon}</span>{PM_MAP[pm].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Note */}
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Ghi chú</label>
@@ -440,8 +466,8 @@ export default function SpaPage() {
 
       {/* SERVICE FORM MODAL */}
       {showServiceForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 32, width: 400 }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 32, width: isMobile ? "100%" : 400 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{editService ? "✏️ Sửa dịch vụ" : "➕ Thêm dịch vụ"}</h2>
               <button onClick={() => setShowServiceForm(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>

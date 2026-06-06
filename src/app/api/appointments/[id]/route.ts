@@ -50,8 +50,9 @@ export async function PUT(req: NextRequest, context: any) {
   try {
     const { id } = await context.params;
     const body = await req.json();
-    const { customerId, petId, serviceId, date, note, price } = body;
+    const { customerId, petId, serviceId, date, note, price, paymentMethod } = body;
     const newPrice = Number(price) || 0;
+    const pm: "CASH" | "BANK_TRANSFER" = paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH";
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
     const [oldRows]: any = await conn.execute("SELECT * FROM Appointment WHERE id=?", [id]);
@@ -61,8 +62,8 @@ export async function PUT(req: NextRequest, context: any) {
     }
 
     await conn.execute(
-      `UPDATE Appointment SET customerId=?, petId=?, serviceId=?, date=?, note=?, price=? WHERE id=?`,
-      [customerId, petId, serviceId, new Date(date).toISOString().slice(0,19).replace("T"," "), note||null, newPrice, id]
+      `UPDATE Appointment SET customerId=?, petId=?, serviceId=?, date=?, note=?, paymentMethod=?, price=? WHERE id=?`,
+      [customerId, petId, serviceId, new Date(date).toISOString().slice(0,19).replace("T"," "), note||null, pm, newPrice, id]
     );
     const [updated]: any = await conn.execute(
       `SELECT a.*, c.name as customerName, c.phone as customerPhone, p.name as petName, p.species as petSpecies,

@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
        FROM Inventory i
        LEFT JOIN Product p ON i.productId = p.id
        LEFT JOIN Supplier s ON i.supplierId = s.id
-       ${where} ORDER BY i.createdAt DESC LIMIT ? OFFSET ?`,
-            [...params, limit, offset]
+       ${where} ORDER BY i.createdAt DESC LIMIT ${parseInt(String(limit))} OFFSET ${parseInt(String(offset))}`,
+            params
         );
 
         const [countResult]: any = await conn.execute(

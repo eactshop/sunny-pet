@@ -46,6 +46,11 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Pet shop brand colors */
+  --color-brand-yellow: #F4B400;
+  --color-brand-green: #4CAF50;
+  --color-brand-yellow-dark: #E5A800;
+  --color-brand-green-dark: #388E3C;
 }
 
 :root {
@@ -127,4 +132,24 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Pet shop utility classes */
+.btn-brand {
+  background-color: #F4B400;
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+.btn-brand:hover {
+  background-color: #E5A800;
+}
+.btn-brand-green {
+  background-color: #4CAF50;
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+.btn-brand-green:hover {
+  background-color: #388E3C;
 }

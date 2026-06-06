@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ";
 
@@ -26,8 +27,13 @@ interface Order {
   id: string; code: string; status: string;
   customerName: string; customerPhone: string;
   subtotal: number; discount: number; total: number;
-  note?: string; createdAt: string; items?: OrderItem[];
+  note?: string; paymentMethod?: string; createdAt: string; items?: OrderItem[];
 }
+
+const PM_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  CASH:          { label: "Tiền mặt",    icon: "💵", color: "#2E7D32", bg: "#E8F5E9" },
+  BANK_TRANSFER: { label: "Chuyển khoản", icon: "🏦", color: "#1565C0", bg: "#E3F2FD" },
+};
 interface OrderItem {
   id: string; productId: string; productName: string;
   productCode: string; quantity: number; price: number; subtotal: number;
@@ -104,6 +110,7 @@ function printInvoice(order: Order, customerName: string, customerPhone: string)
 
 export default function OrdersPage() {
   const { canDelete } = useAuth();
+  const isMobile = useIsMobile();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
@@ -118,6 +125,7 @@ export default function OrdersPage() {
   const [orderItems, setOrderItems] = useState<{ productId: string; name: string; code: string; quantity: number; price: number; stock: number }[]>([]);
   const [discount, setDiscount] = useState("0");
   const [orderNote, setOrderNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK_TRANSFER">("CASH");
   const [saving, setSaving] = useState(false);
   const [customerTab, setCustomerTab] = useState<"existing" | "new">("existing");
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "" });
@@ -156,7 +164,7 @@ export default function OrdersPage() {
     await fetchCustomers();
     await fetchProducts();
     setSelectedCustomer(""); setCustomerSearch(""); setOrderItems([]);
-    setDiscount("0"); setOrderNote(""); setCustomerTab("existing");
+    setDiscount("0"); setOrderNote(""); setPaymentMethod("CASH"); setCustomerTab("existing");
     setNewCustomer({ name: "", phone: "", address: "" });
     setShowCreate(true);
   };
@@ -189,7 +197,7 @@ export default function OrdersPage() {
       }
       const res = await fetch("/api/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, items: orderItems.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })), discount: Number(discount) || 0, note: orderNote }),
+        body: JSON.stringify({ customerId, items: orderItems.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })), discount: Number(discount) || 0, note: orderNote, paymentMethod }),
       });
       const data = await res.json();
       if (data.success) {
@@ -271,22 +279,63 @@ export default function OrdersPage() {
         </select>
       </div>
 
-      {/* Table */}
+      {/* Table / Card List */}
       <div style={{ background: "#fff", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.07)", overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: "center", color: "#888" }}>⏳ Đang tải...</div>
+        ) : isMobile ? (
+          /* MOBILE: Card list */
+          <div>
+            {orders.length === 0 ? (
+              <div style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Chưa có đơn hàng</div>
+            ) : orders.map(o => {
+              const s = STATUS_MAP[o.status] || { label: o.status, color: "#666", bg: "#f5f5f5" };
+              const nextStatuses = STATUS_FLOW[o.status] || [];
+              return (
+                <div key={o.id} style={{ padding: "14px 16px", borderBottom: "1px solid #f5f5f5" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#F4B400" }}>{o.code}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{o.customerName}</div>
+                      <div style={{ fontSize: 11, color: "#888" }}>{o.customerPhone} · {new Date(o.createdAt).toLocaleDateString("vi-VN")}</div>
+                      {o.paymentMethod && <span style={{ background: PM_MAP[o.paymentMethod]?.bg || "#f5f5f5", color: PM_MAP[o.paymentMethod]?.color || "#666", padding: "2px 8px", borderRadius: 20, fontSize: 11, fontWeight: 600, display: "inline-block", marginTop: 3 }}>{PM_MAP[o.paymentMethod]?.icon} {PM_MAP[o.paymentMethod]?.label}</span>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#222" }}>{fmt(o.total)}</div>
+                      <span style={{ background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>{s.label}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => openDetail(o)} style={{ background: "#E3F2FD", color: "#1565C0", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>👁️ Chi tiết</button>
+                    <button onClick={async () => { const res = await fetch(`/api/orders/${o.id}`); const data = await res.json(); if (data.success) printInvoice(data.data, o.customerName, o.customerPhone); }}
+                      style={{ background: "#E8F5E9", color: "#2E7D32", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>🖨️ In</button>
+                    {nextStatuses.map(ns => (
+                      <button key={ns} onClick={() => handleUpdateStatus(o.id, ns)}
+                        style={{ background: STATUS_MAP[ns]?.bg, color: STATUS_MAP[ns]?.color, border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                        → {STATUS_MAP[ns]?.label}
+                      </button>
+                    ))}
+                    {canDelete && (
+                      <button onClick={() => handleDelete(o)} style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>🗑️</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          /* DESKTOP: Table */
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f9f9f9" }}>
-                {["Mã ĐH", "Khách hàng", "Ngày tạo", "Sản phẩm", "Tổng tiền", "Trạng thái", "Thao tác"].map(h => (
+                {["Mã ĐH", "Khách hàng", "Ngày tạo", "Sản phẩm", "Tổng tiền", "Thanh toán", "Trạng thái", "Thao tác"].map(h => (
                   <th key={h} style={{ padding: "12px 14px", textAlign: "left", fontSize: 12, color: "#888", fontWeight: 600, borderBottom: "1px solid #f0f0f0" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {orders.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Chưa có đơn hàng</td></tr>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#aaa" }}>Chưa có đơn hàng</td></tr>
               ) : orders.map(o => {
                 const s = STATUS_MAP[o.status] || { label: o.status, color: "#666", bg: "#f5f5f5" };
                 const nextStatuses = STATUS_FLOW[o.status] || [];
@@ -301,17 +350,16 @@ export default function OrdersPage() {
                     <td style={{ padding: "12px 14px", fontSize: 13 }}>{o.items?.length || 0} SP</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: 700 }}>{fmt(o.total)}</td>
                     <td style={{ padding: "12px 14px" }}>
+                      {o.paymentMethod && <span style={{ background: PM_MAP[o.paymentMethod]?.bg, color: PM_MAP[o.paymentMethod]?.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{PM_MAP[o.paymentMethod]?.icon} {PM_MAP[o.paymentMethod]?.label}</span>}
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
                       <span style={{ background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{s.label}</span>
                     </td>
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        <button onClick={() => openDetail(o)}
-                          style={{ background: "#E3F2FD", color: "#1565C0", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>👁️ Chi tiết</button>
-                        <button onClick={async () => {
-                          const res = await fetch(`/api/orders/${o.id}`);
-                          const data = await res.json();
-                          if (data.success) printInvoice(data.data, o.customerName, o.customerPhone);
-                        }} style={{ background: "#E8F5E9", color: "#2E7D32", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🖨️ In</button>
+                        <button onClick={() => openDetail(o)} style={{ background: "#E3F2FD", color: "#1565C0", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>👁️ Chi tiết</button>
+                        <button onClick={async () => { const res = await fetch(`/api/orders/${o.id}`); const data = await res.json(); if (data.success) printInvoice(data.data, o.customerName, o.customerPhone); }}
+                          style={{ background: "#E8F5E9", color: "#2E7D32", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🖨️ In</button>
                         {nextStatuses.map(ns => (
                           <button key={ns} onClick={() => handleUpdateStatus(o.id, ns)}
                             style={{ background: STATUS_MAP[ns]?.bg, color: STATUS_MAP[ns]?.color, border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
@@ -319,8 +367,7 @@ export default function OrdersPage() {
                           </button>
                         ))}
                         {canDelete && (
-                          <button onClick={() => handleDelete(o)}
-                            style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🗑️ Xóa</button>
+                          <button onClick={() => handleDelete(o)} style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 11 }}>🗑️ Xóa</button>
                         )}
                       </div>
                     </td>
@@ -335,13 +382,13 @@ export default function OrdersPage() {
 
       {/* CREATE MODAL */}
       {showCreate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 28, width: 720, maxHeight: "92vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 28, width: isMobile ? "100%" : 720, maxHeight: isMobile ? "95vh" : "92vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🛒 Tạo đơn hàng mới</h2>
               <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 16 : 20 }}>
               {/* LEFT */}
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
@@ -450,6 +497,18 @@ export default function OrdersPage() {
                     <span style={{ fontWeight: 800, color: "#F4B400", fontSize: 18 }}>{fmt(total)}</span>
                   </div>
                 </div>
+                {/* Payment Method */}
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>💳 Hình thức thanh toán</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {(["CASH", "BANK_TRANSFER"] as const).map(pm => (
+                      <button key={pm} onClick={() => setPaymentMethod(pm)}
+                        style={{ flex: 1, padding: "10px 8px", borderRadius: 10, border: `2px solid ${paymentMethod === pm ? PM_MAP[pm].color : "#e8e8e8"}`, background: paymentMethod === pm ? PM_MAP[pm].bg : "#fff", color: paymentMethod === pm ? PM_MAP[pm].color : "#888", fontWeight: paymentMethod === pm ? 700 : 400, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.15s" }}>
+                        <span>{PM_MAP[pm].icon}</span>{PM_MAP[pm].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 6 }}>Ghi chú</label>
                   <textarea value={orderNote} onChange={e => setOrderNote(e.target.value)} rows={2}
@@ -471,8 +530,8 @@ export default function OrdersPage() {
 
       {/* DETAIL MODAL */}
       {showDetail && detailOrder && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 28, width: 560, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 28, width: isMobile ? "100%" : 560, maxHeight: isMobile ? "95vh" : "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>📋 Chi tiết đơn {detailOrder.code}</h2>
               <button onClick={() => setShowDetail(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
@@ -496,6 +555,14 @@ export default function OrdersPage() {
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>👤 Khách hàng</div>
               <div style={{ fontSize: 13 }}>Tên: <strong>{detailOrder.customerName}</strong></div>
               <div style={{ fontSize: 13 }}>SĐT: {detailOrder.customerPhone}</div>
+              {detailOrder.paymentMethod && (
+                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#666" }}>Thanh toán:</span>
+                  <span style={{ background: PM_MAP[detailOrder.paymentMethod]?.bg, color: PM_MAP[detailOrder.paymentMethod]?.color, padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                    {PM_MAP[detailOrder.paymentMethod]?.icon} {PM_MAP[detailOrder.paymentMethod]?.label}
+                  </span>
+                </div>
+              )}
               <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{new Date(detailOrder.createdAt).toLocaleString("vi-VN")}</div>
             </div>
             <div style={{ marginBottom: 16 }}>

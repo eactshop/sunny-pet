@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
@@ -22,6 +23,7 @@ const VIEW_TABS = [
 ];
 
 export default function ReportsPage() {
+  const isMobile = useIsMobile();
   const now = new Date();
   const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const defaultTo = now.toISOString().slice(0, 10);
@@ -59,7 +61,9 @@ export default function ReportsPage() {
       label: r.label,
       "Bán hàng": r.orderRevenue,
       "Spa": r.spaRevenue,
-      "Tổng": r.totalRevenue,
+      "Hoàn hàng": r.totalReturnedRevenue || 0,
+      "Thực nhận": r.netRevenue || 0,
+      "Tổng gộp": r.totalRevenue,
       revenue: viewType === "all" ? r.totalRevenue : viewType === "order" ? r.orderRevenue : r.spaRevenue,
     }));
   };
@@ -117,16 +121,16 @@ export default function ReportsPage() {
       ) : (
         <>
           {/* Summary cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit,minmax(155px,1fr))", gap: 12, marginBottom: 20 }}>
             {[
-              { icon: "💰", label: "Tổng doanh thu", value: fmt(s.totalRevenue), color: "#F4B400" },
-              { icon: "🛒", label: "Doanh thu bán hàng", value: fmt(s.totalOrderRev), sub: `${s.totalOrderCount} đơn`, color: "#4CAF50" },
+              { icon: "💰", label: "Tổng doanh thu gộp", value: fmt(s.totalRevenue), sub: "Bao gồm spa", color: "#F4B400" },
+              { icon: "🛒", label: "Doanh thu bán hàng", value: fmt(s.totalOrderRev), sub: `${s.totalOrderCompleted}/${s.totalOrderCount} đơn`, color: "#4CAF50" },
               { icon: "✂️", label: "Doanh thu spa", value: fmt(s.totalSpaRev), sub: `${s.totalSpaCompleted}/${s.totalSpaCount} lịch`, color: "#42A5F5" },
-              { icon: "✅", label: "Đơn hoàn thành", value: s.totalOrderCompleted, sub: `Tỷ lệ: ${s.conversionRate}%`, color: "#2E7D32" },
-              { icon: "↩️", label: "Đơn hoàn trả", value: s.totalOrderReturned, color: "#FF7043" },
-              { icon: "❌", label: "Đơn hủy", value: s.totalOrderCancelled, color: "#B71C1C" },
+              { icon: "↩️", label: "Doanh thu hoàn hàng", value: fmt(s.totalReturnedRev || 0), sub: `${s.totalOrderReturned} đơn hoàn`, color: "#FF7043" },
+              { icon: "❌", label: "Doanh thu đơn hủy", value: fmt(s.totalCancelledRev || 0), sub: `${s.totalOrderCancelled} đơn hủy`, color: "#EF5350" },
+              { icon: "✅", label: "Doanh thu thực (NET)", value: fmt(s.totalNetRev || 0), sub: `Sau trừ hoàn hàng`, color: "#2E7D32", highlight: true },
             ].map(c => (
-              <div key={c.label} style={{ background: "#fff", borderRadius: 14, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${c.color}`, display: "flex", alignItems: "center", gap: 12 }}>
+              <div key={c.label} style={{ background: (c as any).highlight ? "#E8F5E9" : "#fff", borderRadius: 14, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${c.color}`, display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 24 }}>{c.icon}</span>
                 <div>
                   <div style={{ fontSize: 11, color: "#888" }}>{c.label}</div>
@@ -135,6 +139,72 @@ export default function ReportsPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Net revenue breakdown bar */}
+          {s.totalRevenue > 0 && (
+            <div style={{ background: "#fff", borderRadius: 14, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#222", marginBottom: 12 }}>📊 Phân tích doanh thu thực</div>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 10 }}>
+                {[
+                  { label: "Doanh thu gộp", value: s.totalRevenue, color: "#F4B400" },
+                  { label: "Hoàn hàng (-)", value: s.totalReturnedRev || 0, color: "#FF7043" },
+                  { label: "Doanh thu thực", value: s.totalNetRev || 0, color: "#2E7D32" },
+                ].map(item => (
+                  <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: item.color }} />
+                    <span style={{ fontSize: 12, color: "#666" }}>{item.label}:</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{fmt(item.value)}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ height: 12, borderRadius: 8, background: "#f0f0f0", overflow: "hidden", display: "flex" }}>
+                <div style={{ height: "100%", background: "#2E7D32", width: `${s.totalRevenue > 0 ? Math.round((s.totalNetRev || 0) / s.totalRevenue * 100) : 0}%`, transition: "width 0.5s", borderRadius: "8px 0 0 8px" }} />
+                <div style={{ height: "100%", background: "#FF7043", width: `${s.totalRevenue > 0 ? Math.round((s.totalReturnedRev || 0) / s.totalRevenue * 100) : 0}%`, transition: "width 0.5s" }} />
+              </div>
+              <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                Doanh thu thực = {s.totalRevenue > 0 ? Math.round((s.totalNetRev || 0) / s.totalRevenue * 100) : 0}% tổng doanh thu gộp
+              </div>
+            </div>
+          )}
+
+          {/* Payment method breakdown */}
+          <div style={{ background: "#fff", borderRadius: 16, padding: "16px 20px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#222", marginBottom: 14 }}>💳 Hình thức thanh toán</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ background: "#E8F5E9", borderRadius: 14, padding: "16px 18px", borderLeft: "4px solid #2E7D32" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 28 }}>💵</span>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#2E7D32", fontWeight: 600 }}>Tiền mặt</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#2E7D32" }}>{fmt(s.cashRevenue || 0)}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: "#555" }}>{s.cashCount || 0} đơn hàng</div>
+                <div style={{ marginTop: 8, height: 6, borderRadius: 4, background: "#f0f0f0", overflow: "hidden" }}>
+                  <div style={{ height: "100%", borderRadius: 4, background: "#2E7D32", width: `${(s.totalOrderRev > 0 && s.cashRevenue) ? Math.round(s.cashRevenue / s.totalOrderRev * 100) : 0}%` }} />
+                </div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
+                  {(s.totalOrderRev > 0 && s.cashRevenue) ? Math.round(s.cashRevenue / s.totalOrderRev * 100) : 0}% tổng đơn hàng
+                </div>
+              </div>
+              <div style={{ background: "#E3F2FD", borderRadius: 14, padding: "16px 18px", borderLeft: "4px solid #1565C0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 28 }}>🏦</span>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#1565C0", fontWeight: 600 }}>Chuyển khoản</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#1565C0" }}>{fmt(s.bankRevenue || 0)}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: "#555" }}>{s.bankCount || 0} đơn hàng</div>
+                <div style={{ marginTop: 8, height: 6, borderRadius: 4, background: "#f0f0f0", overflow: "hidden" }}>
+                  <div style={{ height: "100%", borderRadius: 4, background: "#1565C0", width: `${(s.totalOrderRev > 0 && s.bankRevenue) ? Math.round(s.bankRevenue / s.totalOrderRev * 100) : 0}%` }} />
+                </div>
+                <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>
+                  {(s.totalOrderRev > 0 && s.bankRevenue) ? Math.round(s.bankRevenue / s.totalOrderRev * 100) : 0}% tổng đơn hàng
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Revenue chart */}
@@ -150,32 +220,38 @@ export default function ReportsPage() {
                 ))}
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={300}>
               {viewType === "all" ? (
-                <BarChart data={getChartData()}>
+                <BarChart data={getChartData()} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={v => v === 0 ? "0" : (v/1000000).toFixed(1)+"M"} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} />
                   <Legend />
-                  <Bar dataKey="Bán hàng" fill="#4CAF50" stackId="a" radius={[0,0,0,0]} />
-                  <Bar dataKey="Spa" fill="#42A5F5" stackId="a" radius={[4,4,0,0]} />
+                  <Bar dataKey="Bán hàng" fill="#4CAF50" stackId="rev" radius={[0,0,0,0]} />
+                  <Bar dataKey="Spa" fill="#42A5F5" stackId="rev" radius={[0,0,0,0]} />
+                  <Bar dataKey="Hoàn hàng" fill="#FF7043" stackId="ret" radius={[4,4,0,0]} />
+                  <Line type="monotone" dataKey="Thực nhận" stroke="#2E7D32" strokeWidth={2.5} dot={{ r: 3 }} />
                 </BarChart>
               ) : (
-                <BarChart data={getChartData()}>
+                <BarChart data={getChartData()} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={v => v === 0 ? "0" : (v/1000000).toFixed(1)+"M"} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Tooltip formatter={(v) => fmt(Number(v))} />
+                  <Legend />
                   <Bar dataKey="revenue" fill={VIEW_TABS.find(t => t.key === viewType)?.color} radius={[6,6,0,0]}
                     name={viewType === "order" ? "Bán hàng" : "Spa"} />
+                  {viewType === "order" && (
+                    <Bar dataKey="Hoàn hàng" fill="#FF7043" radius={[4,4,0,0]} />
+                  )}
                 </BarChart>
               )}
             </ResponsiveContainer>
           </div>
 
           {/* Top products + Top services */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
             {/* Top products */}
             <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: "#222" }}>🏆 Top sản phẩm bán chạy</div>
@@ -218,10 +294,10 @@ export default function ReportsPage() {
                 <>
                   <ResponsiveContainer width="100%" height={180}>
                     <PieChart>
-                      <Pie data={data.topServices} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
+                      <Pie data={data.topServices} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} ${((percent || 0)*100).toFixed(0)}%`} labelLine={false}>
                         {data.topServices.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v: number, name: string) => [v + " lịch", name]} />
+                      <Tooltip formatter={(v, name) => [Number(v) + " lịch", String(name)]} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>

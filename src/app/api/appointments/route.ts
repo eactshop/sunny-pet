@@ -38,8 +38,8 @@ export async function GET(req: NextRequest) {
        LEFT JOIN Customer c ON a.customerId = c.id
        LEFT JOIN Pet p ON a.petId = p.id
        LEFT JOIN Service s ON a.serviceId = s.id
-       ${where} ORDER BY a.date ASC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ${where} ORDER BY a.date ASC LIMIT ${parseInt(String(limit))} OFFSET ${parseInt(String(offset))}`,
+      params
     );
 
     const [countResult]: any = await conn.execute(
@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
   const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const body = await req.json();
-    const { customerId, petId, serviceId, date, note, price } = body;
+    const { customerId, petId, serviceId, date, note, price, paymentMethod } = body;
+    const pm: "CASH" | "BANK_TRANSFER" = paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH";
 
     if (!customerId || !petId || !serviceId || !date) {
       await conn.end();
@@ -76,9 +77,9 @@ export async function POST(req: NextRequest) {
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
     await conn.execute(
-      `INSERT INTO Appointment (id, customerId, petId, serviceId, date, status, note, price, createdAt)
-       VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`,
-      [id, customerId, petId, serviceId, new Date(date).toISOString().slice(0, 19).replace("T", " "), note || null, Number(price) || 0, now]
+      `INSERT INTO Appointment (id, customerId, petId, serviceId, date, status, note, paymentMethod, price, createdAt)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)`,
+      [id, customerId, petId, serviceId, new Date(date).toISOString().slice(0, 19).replace("T", " "), note || null, pm, Number(price) || 0, now]
     );
 
     const [newRow]: any = await conn.execute(

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -51,6 +52,7 @@ const SOURCE_TABS = [
 ];
 
 export default function DashboardPage() {
+  const isMobile = useIsMobile();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState("month");
@@ -107,24 +109,41 @@ export default function DashboardPage() {
   const summary = getSummary();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 14 : 20 }}>
+      {/* Refresh button */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={() => { setLoading(true); fetch(`/api/dashboard?_t=${Date.now()}`).then(r => r.json()).then(d => { if (d.success) setData(d.data); }).finally(() => setLoading(false)); fetchReport(); }}
+          style={{ background: "#f5f5f5", border: "1.5px solid #e0e0e0", borderRadius: 10, padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#555", display: "flex", alignItems: "center", gap: 6 }}
+        >
+          🔄 Cập nhật số liệu
+        </button>
+      </div>
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(190px, 1fr))", gap: isMobile ? 10 : 14 }}>
         <StatCard icon="💰" label="Doanh thu hôm nay" value={fmt(data.todayRevenue)}
           sub={`🛒 ${fmt(data.todayOrderRevenue)}`} sub2={`✂️ ${fmt(data.todaySpaRevenue)}`} color="#F4B400" />
         <StatCard icon="📅" label="Doanh thu tháng này" value={fmt(data.monthRevenue)}
           sub={`🛒 ${fmt(data.monthOrderRevenue)}`} sub2={`✂️ ${fmt(data.monthSpaRevenue)}`} color="#4CAF50" />
-        <StatCard icon="📦" label="Tổng đơn hàng" value={data.totalOrders} sub="Tháng này" color="#42A5F5" />
+        <StatCard icon="✅" label="Doanh thu thực (tháng)" value={fmt(data.netMonthRevenue || 0)}
+          sub={`Sau trừ hoàn hàng`} color="#2E7D32" />
+        <StatCard icon="↩️" label="Đã hoàn hàng (tháng)" value={fmt(data.returnedRevMonth || 0)}
+          sub={`${data.returnedOrders} đơn hoàn`} color="#FF7043" />
+        <StatCard icon="❌" label="Đơn hủy (tháng)" value={data.cancelledOrders || 0}
+          sub="Số đơn bị hủy" color="#B71C1C" />
+        <StatCard icon="📦" label="Tổng đơn hàng" value={data.totalOrders} sub="Tháng này (trừ hủy)" color="#42A5F5" />
         <StatCard icon="🚚" label="Đang giao" value={data.shippingOrders} sub="Cần xử lý" color="#FF7043" />
         <StatCard icon="✂️" label="Lịch spa hôm nay" value={data.todaySpaCount} sub="Đã đặt" color="#AB47BC" />
         <StatCard icon="👤" label="Khách hàng mới" value={data.newCustomers} sub="Tháng này" color="#26A69A" />
+        <StatCard icon="💵" label="Tiền mặt (tháng này)" value={fmt(data.monthCashRevenue || 0)} sub={`${data.monthCashCount || 0} đơn`} color="#2E7D32" />
+        <StatCard icon="🏦" label="Chuyển khoản (tháng)" value={fmt(data.monthBankRevenue || 0)} sub={`${data.monthBankCount || 0} đơn`} color="#1565C0" />
       </div>
 
       {/* ── BÁO CÁO DOANH THU ── */}
-      <div style={{ background: "#fff", borderRadius: 16, padding: "22px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: isMobile ? "16px" : "22px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
           <div style={{ fontWeight: 700, fontSize: 16, color: "#222" }}>📊 Báo cáo doanh thu</div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {/* Period tabs */}
             <div style={{ display: "flex", background: "#f5f5f5", borderRadius: 10, padding: 3, gap: 2 }}>
               {REPORT_TABS.map(t => (
@@ -148,11 +167,13 @@ export default function DashboardPage() {
 
         {/* Summary */}
         {reportData && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(130px,1fr))", gap: 10, marginBottom: 16 }}>
             {[
               { label: "Tổng doanh thu", value: fmt(summary.revenue), color: SOURCE_TABS.find(s => s.key === sourceType)?.color || "#F4B400" },
-              { label: "Đơn hàng", value: `${fmt(reportData.totalOrderRev)}`, sub: `${reportData.totalOrderCount} đơn`, color: "#4CAF50" },
-              { label: "Spa", value: `${fmt(reportData.totalSpaRev)}`, sub: `${reportData.totalSpaCount} lịch`, color: "#42A5F5" },
+              { label: "Đơn hàng", value: fmt(reportData.totalOrderRev), sub: `${reportData.totalOrderCount} đơn`, color: "#4CAF50" },
+              { label: "Spa", value: fmt(reportData.totalSpaRev), sub: `${reportData.totalSpaCount} lịch`, color: "#42A5F5" },
+              { label: "💵 Tiền mặt", value: fmt(reportData.pmSummary?.cashRevenue || 0), sub: `${reportData.pmSummary?.cashCount || 0} đơn`, color: "#2E7D32" },
+              { label: "🏦 Chuyển khoản", value: fmt(reportData.pmSummary?.bankRevenue || 0), sub: `${reportData.pmSummary?.bankCount || 0} đơn`, color: "#1565C0" },
             ].map(s => (
               <div key={s.label} style={{ background: "#f9f9f9", borderRadius: 12, padding: "12px 14px", borderLeft: `3px solid ${s.color}` }}>
                 <div style={{ fontSize: 11, color: "#888" }}>{s.label}</div>
@@ -165,15 +186,15 @@ export default function DashboardPage() {
 
         {/* Chart */}
         {reportLoading ? (
-          <div style={{ height: 260, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>⏳ Đang tải...</div>
+          <div style={{ height: isMobile ? 200 : 260, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>⏳ Đang tải...</div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
             {sourceType === "all" ? (
               <BarChart data={getChartData()} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={v => v === 0 ? "0" : (v/1000000).toFixed(1)+"M"} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Tooltip formatter={(v) => fmt(Number(v))} />
                 <Legend />
                 <Bar dataKey="Bán hàng" fill="#4CAF50" radius={[4,4,0,0]} stackId="a" />
                 <Bar dataKey="Spa" fill="#42A5F5" radius={[4,4,0,0]} stackId="a" />
@@ -183,7 +204,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={v => v === 0 ? "0" : (v/1000000).toFixed(1)+"M"} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Tooltip formatter={(v) => fmt(Number(v))} />
                 <Bar dataKey="revenue" fill={SOURCE_TABS.find(s => s.key === sourceType)?.color || "#F4B400"} radius={[6,6,0,0]}
                   name={sourceType === "order" ? "Bán hàng" : "Spa"} />
               </BarChart>
@@ -193,7 +214,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 7-day trend + Top products */}
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 16 }}>
         <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, color: "#222" }}>📈 Xu hướng 7 ngày gần đây</div>
           <ResponsiveContainer width="100%" height={200}>
@@ -201,7 +222,7 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="day" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={v => v === 0 ? "0" : (v/1000000).toFixed(1)+"M"} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Tooltip formatter={(v) => fmt(Number(v))} />
               <Legend />
               <Line type="monotone" dataKey="orderRevenue" stroke="#4CAF50" strokeWidth={2} dot={{ r: 3 }} name="Bán hàng" />
               <Line type="monotone" dataKey="spaRevenue" stroke="#42A5F5" strokeWidth={2} dot={{ r: 3 }} name="Spa" />
@@ -240,7 +261,7 @@ export default function DashboardPage() {
       )}
 
       {/* Recent orders + Spa today */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
         <div style={{ background: "#fff", borderRadius: 16, padding: "20px 24px", boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14, color: "#222" }}>📋 Đơn hàng gần đây</div>
           {data.recentOrders.length === 0 ? (

@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n) + "đ";
 
 interface Customer {
   id: string; name: string; phone: string; email?: string;
   address?: string; totalOrders: number; totalSpent: number;
-  lastOrderAt?: string; petCount: number; createdAt: string;
+  lastOrderAt?: string; petCount: number; spaCount?: number; createdAt: string;
 }
 interface Pet {
   id: string; name: string; species: string; breed?: string;
@@ -31,6 +33,8 @@ const SPECIES_EMOJI: Record<string, string> = {
 };
 
 export default function CustomersPage() {
+  const { canDelete, canEdit } = useAuth();
+  const isMobile = useIsMobile();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -250,9 +254,9 @@ export default function CustomersPage() {
               {/* Actions */}
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button onClick={() => openDetail(c)} style={{ background: "#E3F2FD", color: "#1565C0", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>👁️ Xem</button>
-                <button onClick={() => openEdit(c)} style={{ background: "#E8F5E9", color: "#2E7D32", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>✏️ Sửa</button>
+                {canEdit && <button onClick={() => openEdit(c)} style={{ background: "#E8F5E9", color: "#2E7D32", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>✏️ Sửa</button>}
                 <button onClick={() => openAddPet(c.id)} style={{ background: "#FFF8E1", color: "#F57F17", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>🐾 Thêm pet</button>
-                <button onClick={() => handleDelete(c)} style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>🗑️</button>
+                {canDelete && <button onClick={() => handleDelete(c)} style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>🗑️</button>}
               </div>
             </div>
           ))}
@@ -261,8 +265,8 @@ export default function CustomersPage() {
 
       {/* CUSTOMER FORM MODAL */}
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: 32, width: 460 }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: isMobile ? "20px 20px 0 0" : 20, padding: isMobile ? "20px 16px" : 32, width: isMobile ? "100%" : 460, maxHeight: "92vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{editCustomer ? "✏️ Sửa khách hàng" : "➕ Thêm khách hàng"}</h2>
               <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>✕</button>
@@ -338,8 +342,8 @@ export default function CustomersPage() {
                     </div>
                     {pet.note && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>📝 {pet.note}</div>}
                   </div>
-                  <button onClick={() => handleDeletePet(pet.id)}
-                    style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 12 }}>🗑️</button>
+                  {canDelete && <button onClick={() => handleDeletePet(pet.id)}
+                    style={{ background: "#FFEBEE", color: "#B71C1C", border: "none", padding: "5px 10px", borderRadius: 7, cursor: "pointer", fontSize: 12 }}>🗑️</button>}
                 </div>
               ))}
             </div>

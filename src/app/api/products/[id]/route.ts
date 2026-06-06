@@ -41,13 +41,14 @@ export async function PUT(req: NextRequest, context: any) {
     const minStock = Number(body.minStock) || 5;
     const categoryId = String(body.categoryId || "");
     const image = body.image ? String(body.image) : null;
+    const salePrice = body.salePrice !== undefined && body.salePrice !== "" ? Number(body.salePrice) : null;
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
     if (!name || !categoryId) { await conn.end(); return NextResponse.json({ success: false, error: "Thiếu tên hoặc danh mục" }, { status: 400 }); }
 
     await conn.execute(
-      `UPDATE Product SET name=?, description=?, buyPrice=?, sellPrice=?, stock=?, minStock=?, categoryId=?, image=?, updatedAt=? WHERE id=?`,
-      [name, description, buyPrice, sellPrice, stock, minStock, categoryId, image, now, id]
+      `UPDATE Product SET name=?, description=?, buyPrice=?, sellPrice=?, salePrice=?, stock=?, minStock=?, categoryId=?, image=?, updatedAt=? WHERE id=?`,
+      [name, description, buyPrice, sellPrice, salePrice, stock, minStock, categoryId, image, now, id]
     );
     const [updated]: any = await conn.execute(
       `SELECT p.*, c.name as categoryName FROM Product p LEFT JOIN Category c ON p.categoryId = c.id WHERE p.id = ?`, [id]

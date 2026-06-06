@@ -26,8 +26,8 @@ export async function GET(req: NextRequest) {
       `SELECT o.*, c.name as customerName, c.phone as customerPhone
        FROM \`Order\` o
        LEFT JOIN Customer c ON o.customerId = c.id
-       ${where} ORDER BY o.createdAt DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ${where} ORDER BY o.createdAt DESC LIMIT ${parseInt(String(limit))} OFFSET ${parseInt(String(offset))}`,
+      params
     );
 
     const [countResult]: any = await conn.execute(
@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
   const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const body = await req.json();
-    const { customerId, items, discount, note, promotionId } = body;
+    const { customerId, items, discount, note, promotionId, paymentMethod } = body;
+    const pm: "CASH" | "BANK_TRANSFER" = paymentMethod === "BANK_TRANSFER" ? "BANK_TRANSFER" : "CASH";
 
     if (!customerId || !items || items.length === 0) {
       await conn.end();
@@ -101,9 +102,9 @@ export async function POST(req: NextRequest) {
 
     // Create order
     await conn.execute(
-      `INSERT INTO \`Order\` (id, code, customerId, userId, status, subtotal, discount, total, note, promotionId, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?)`,
-      [id, code, customerId, userId, subtotal, discountAmt, total, note || null, promotionId || null, now, now]
+      `INSERT INTO \`Order\` (id, code, customerId, userId, status, subtotal, discount, total, note, paymentMethod, promotionId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, code, customerId, userId, subtotal, discountAmt, total, note || null, pm, promotionId || null, now, now]
     );
 
     // Create order items

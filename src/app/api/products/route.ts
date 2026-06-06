@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
     const [items]: any = await conn.execute(
       `SELECT p.*, c.name as categoryName FROM Product p
        LEFT JOIN Category c ON p.categoryId = c.id
-       ${where} ORDER BY p.createdAt DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ${where} ORDER BY p.createdAt DESC LIMIT ${parseInt(String(limit))} OFFSET ${parseInt(String(offset))}`,
+      params
     );
 
     const [countResult]: any = await conn.execute(
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, description, buyPrice, sellPrice, stock, minStock, categoryId, image } = body;
+    const { name, description, buyPrice, sellPrice, salePrice, stock, minStock, categoryId, image } = body;
 
     if (!name || !buyPrice || !sellPrice || !categoryId) {
       return NextResponse.json({ success: false, error: "Thiếu thông tin bắt buộc" }, { status: 400 });
@@ -77,10 +77,11 @@ export async function POST(req: NextRequest) {
     const id = Math.random().toString(36).slice(2, 18) + Math.random().toString(36).slice(2, 10);
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
+    const salePriceVal = salePrice !== undefined && salePrice !== "" ? Number(salePrice) : null;
     await conn.execute(
-      `INSERT INTO Product (id, code, name, description, buyPrice, sellPrice, stock, minStock, image, categoryId, active, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-      [id, code, name, description || null, buyPrice, sellPrice, stock || 0, minStock || 5, image || null, categoryId, now, now]
+      `INSERT INTO Product (id, code, name, description, buyPrice, sellPrice, salePrice, stock, minStock, image, categoryId, active, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [id, code, name, description || null, buyPrice, sellPrice, salePriceVal, stock || 0, minStock || 5, image || null, categoryId, now, now]
     );
 
     const [newProduct]: any = await conn.execute(

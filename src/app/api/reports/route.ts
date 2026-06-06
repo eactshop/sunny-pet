@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 
+export const dynamic = "force-dynamic";
+
 const DB = {
   host: "localhost", port: 3306,
   user: "root", password: "", database: "sunny_pet",
@@ -25,10 +27,12 @@ export async function GET(req: NextRequest) {
     // Orders by period
     const [orderRows]: any = await conn.execute(
       `SELECT ${dateExpr} as period,
-        COALESCE(SUM(total),0) as revenue,
+        COALESCE(SUM(CASE WHEN status='COMPLETED' THEN total ELSE 0 END),0) as revenue,
+        COALESCE(SUM(CASE WHEN status='RETURNED'  THEN total ELSE 0 END),0) as returnedRevenue,
+        COALESCE(SUM(CASE WHEN status='CANCELLED' THEN total ELSE 0 END),0) as cancelledRevenue,
         COUNT(*) as count,
         SUM(CASE WHEN status='COMPLETED' THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN status='RETURNED' THEN 1 ELSE 0 END) as returned,
+        SUM(CASE WHEN status='RETURNED'  THEN 1 ELSE 0 END) as returned,
         SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END) as cancelled
        FROM \`Order\`
        WHERE createdAt BETWEEN ? AND ?
@@ -55,6 +59,9 @@ export async function GET(req: NextRequest) {
       merged[key] = {
         period: key,
         orderRevenue: Number(r.revenue),
+        orderReturnedRevenue: Number(r.returnedRevenue),
+        orderCancelledRevenue: Number(r.cancelledRevenue),
+        orderNetRevenue: Number(r.revenue) - Number(r.returnedRevenue),
         orderCount: Number(r.count),
         orderCompleted: Number(r.completed),
         orderReturned: Number(r.returned),
@@ -64,7 +71,7 @@ export async function GET(req: NextRequest) {
     }
     for (const r of spaRows) {
       const key = String(r.period);
-      if (!merged[key]) merged[key] = { period: key, orderRevenue: 0, orderCount: 0, orderCompleted: 0, orderReturned: 0, orderCancelled: 0 };
+      if (!merged[key]) merged[key] = { period: key, orderRevenue: 0, orderReturnedRevenue: 0, orderCancelledRevenue: 0, orderNetRevenue: 0, orderCount: 0, orderCompleted: 0, orderReturned: 0, orderCancelled: 0 };
       merged[key].spaRevenue = Number(r.revenue);
       merged[key].spaCount = Number(r.count);
       merged[key].spaCompleted = Number(r.completed);
@@ -77,12 +84,20 @@ export async function GET(req: NextRequest) {
       } else if (groupBy === "month") {
         label = r.period.slice(5, 7) + "/" + r.period.slice(0, 4);
       }
-      return { ...r, label, totalRevenue: r.orderRevenue + r.spaRevenue };
+      return {
+        ...r, label,
+        totalRevenue: r.orderRevenue + r.spaRevenue,
+        totalReturnedRevenue: r.orderReturnedRevenue || 0,
+        netRevenue: (r.orderRevenue - (r.orderReturnedRevenue || 0)) + (r.spaRevenue || 0),
+      };
     }).sort((a: any, b: any) => String(a.period).localeCompare(String(b.period)));
 
     // Summary
     const totalOrderRev = chartData.reduce((s, r) => s + r.orderRevenue, 0);
     const totalSpaRev = chartData.reduce((s, r) => s + r.spaRevenue, 0);
+    const totalReturnedRev = chartData.reduce((s, r) => s + (r.orderReturnedRevenue || 0), 0);
+    const totalCancelledRev = chartData.reduce((s, r) => s + (r.orderCancelledRevenue || 0), 0);
+    const totalNetRev = totalOrderRev - totalReturnedRev + totalSpaRev;
     const totalOrderCount = chartData.reduce((s, r) => s + r.orderCount, 0);
     const totalOrderCompleted = chartData.reduce((s, r) => s + r.orderCompleted, 0);
     const totalOrderReturned = chartData.reduce((s, r) => s + r.orderReturned, 0);
@@ -133,6 +148,28 @@ export async function GET(req: NextRequest) {
       [rangeStart, rangeEnd]
     );
 
+    // Payment method breakdown (tất cả đơn trừ hủy/hoàn hàng)
+    const [pmOrderData]: any = await conn.execute(
+      `SELECT paymentMethod, COALESCE(SUM(total),0) as revenue, COUNT(*) as count
+       FROM \`Order\` WHERE status NOT IN ('CANCELLED','RETURNED') AND createdAt BETWEEN ? AND ?
+       GROUP BY paymentMethod`, [rangeStart, rangeEnd]
+    );
+    const [pmSpaData]: any = await conn.execute(
+      `SELECT 'CASH' as paymentMethod, COALESCE(SUM(price),0) as revenue, COUNT(*) as count
+       FROM Appointment WHERE status NOT IN ('CANCELLED') AND createdAt BETWEEN ? AND ?`,
+      [rangeStart, rangeEnd]
+    );
+    const pmAgg: Record<string, {revenue:number,count:number}> = { CASH: {revenue:0,count:0}, BANK_TRANSFER: {revenue:0,count:0} };
+    for (const r of [...pmOrderData, ...pmSpaData]) {
+      if (!pmAgg[r.paymentMethod]) pmAgg[r.paymentMethod] = {revenue:0,count:0};
+      pmAgg[r.paymentMethod].revenue += Number(r.revenue);
+      pmAgg[r.paymentMethod].count += Number(r.count);
+    }
+    const paymentSummary = {
+      cashRevenue: pmAgg.CASH.revenue, cashCount: pmAgg.CASH.count,
+      bankRevenue: pmAgg.BANK_TRANSFER.revenue, bankCount: pmAgg.BANK_TRANSFER.count,
+    };
+
     await conn.end();
     return NextResponse.json({
       success: true,
@@ -140,10 +177,12 @@ export async function GET(req: NextRequest) {
         chartData,
         summary: {
           totalRevenue: totalOrderRev + totalSpaRev,
+          totalReturnedRev, totalCancelledRev, totalNetRev,
           totalOrderRev, totalSpaRev,
           totalOrderCount, totalOrderCompleted, totalOrderReturned, totalOrderCancelled,
           totalSpaCount, totalSpaCompleted,
           conversionRate: totalOrderCount > 0 ? Math.round(totalOrderCompleted / totalOrderCount * 100) : 0,
+          ...paymentSummary,
         },
         topProducts,
         topCustomers,

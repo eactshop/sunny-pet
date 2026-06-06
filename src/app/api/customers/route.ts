@@ -23,13 +23,17 @@ export async function GET(req: NextRequest) {
     }
 
     const [items]: any = await conn.execute(
-      `SELECT c.*, COUNT(DISTINCT p.id) as petCount,
-  COUNT(DISTINCT a.id) as spaCount
- FROM Customer c
- LEFT JOIN Pet p ON p.customerId = c.id
- LEFT JOIN Appointment a ON a.customerId = c.id AND a.status = 'COMPLETED'
- ${where} GROUP BY c.id ORDER BY c.createdAt DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      `SELECT c.*,
+        COUNT(DISTINCT p.id) as petCount,
+        COUNT(DISTINCT CASE WHEN a.status='COMPLETED' THEN a.id END) as spaCount,
+        COUNT(DISTINCT o.id) as totalOrders,
+        COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total ELSE 0 END), 0) as totalSpent
+       FROM Customer c
+       LEFT JOIN Pet p ON p.customerId = c.id
+       LEFT JOIN Appointment a ON a.customerId = c.id
+       LEFT JOIN \`Order\` o ON o.customerId = c.id
+       ${where} GROUP BY c.id ORDER BY c.createdAt DESC LIMIT ${parseInt(String(limit))} OFFSET ${parseInt(String(offset))}`,
+      params
     );
 
     const [countResult]: any = await conn.execute(

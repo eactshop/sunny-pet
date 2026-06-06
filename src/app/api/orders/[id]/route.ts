@@ -87,8 +87,42 @@ export async function DELETE(req: NextRequest, context: any) {
     if (user.role !== "OWNER") { await conn.end(); return NextResponse.json({ success: false, error: "Bạn không có quyền xóa!" }, { status: 403 }); }
 
     const { id } = await context.params;
+    const [orderRows]: any = await conn.execute(
+      "SELECT customerId, total, status FROM `Order` WHERE id=?", [id]
+    );
+    if (!orderRows.length) {
+      await conn.end();
+      return NextResponse.json({ success: false, error: "Không tìm thấy đơn hàng" }, { status: 404 });
+    }
+    const order = orderRows[0];
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+    // Hoàn kho nếu đơn đã COMPLETED
+    if (order.status === "COMPLETED") {
+      const [orderItems]: any = await conn.execute(
+        "SELECT productId, quantity FROM OrderItem WHERE orderId=?", [id]
+      );
+      for (const item of orderItems) {
+        await conn.execute(
+          "UPDATE Product SET stock=stock+?, updatedAt=? WHERE id=?",
+          [item.quantity, now, item.productId]
+        );
+      }
+    }
+
     await conn.execute("DELETE FROM OrderItem WHERE orderId=?", [id]);
     await conn.execute("DELETE FROM `Order` WHERE id=?", [id]);
+
+    // Sync lại customer stats từ data thực
+    const cid = order.customerId;
+    await conn.execute(
+      `UPDATE Customer SET
+        totalOrders = (SELECT COUNT(*) FROM \`Order\` WHERE customerId=? AND status NOT IN ('CANCELLED')),
+        totalSpent  = COALESCE((SELECT SUM(total) FROM \`Order\` WHERE customerId=? AND status='COMPLETED'),0),
+        updatedAt=? WHERE id=?`,
+      [cid, cid, now, cid]
+    );
+
     await conn.end();
     return NextResponse.json({ success: true, data: { message: "Đã xóa đơn hàng" } });
   } catch (e: any) { await conn.end(); return NextResponse.json({ success: false, error: e.message }, { status: 500 }); }

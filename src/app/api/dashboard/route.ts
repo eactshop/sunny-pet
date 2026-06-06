@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 
+export const dynamic = "force-dynamic";
+
 const DB = {
   host: "localhost", port: 3306,
   user: "root", password: "", database: "sunny_pet",
@@ -30,15 +32,45 @@ export async function GET(req: NextRequest) {
     const [monthSpa]: any = await conn.execute(
       `SELECT COALESCE(SUM(price),0) as r FROM Appointment WHERE status='COMPLETED' AND createdAt>=?`, [monthStart]);
     const [totalOrders]: any = await conn.execute(
-      `SELECT COUNT(*) as c FROM \`Order\` WHERE createdAt>=?`, [monthStart]);
+      `SELECT COUNT(*) as c FROM \`Order\` WHERE createdAt>=? AND status NOT IN ('CANCELLED')`, [monthStart]);
     const [shippingOrders]: any = await conn.execute(
       `SELECT COUNT(*) as c FROM \`Order\` WHERE status='SHIPPING'`);
     const [returnedOrders]: any = await conn.execute(
       `SELECT COUNT(*) as c FROM \`Order\` WHERE status='RETURNED' AND createdAt>=?`, [monthStart]);
+    const [returnedRevMonth]: any = await conn.execute(
+      `SELECT COALESCE(SUM(total),0) as r FROM \`Order\` WHERE status='RETURNED' AND createdAt>=?`, [monthStart]);
+    const [cancelledOrders]: any = await conn.execute(
+      `SELECT COUNT(*) as c FROM \`Order\` WHERE status='CANCELLED' AND createdAt>=?`, [monthStart]);
+    const [returnedRevToday]: any = await conn.execute(
+      `SELECT COALESCE(SUM(total),0) as r FROM \`Order\` WHERE status='RETURNED' AND createdAt>=?`, [todayStart]);
     const [newCustomers]: any = await conn.execute(
       `SELECT COUNT(*) as c FROM Customer WHERE createdAt>=?`, [monthStart]);
     const [todaySpaCount]: any = await conn.execute(
       `SELECT COUNT(*) as c FROM Appointment WHERE DATE(date)=CURDATE()`);
+
+    // ─── PAYMENT METHOD STATS (Order + Spa, tất cả trừ hủy/hoàn) ──
+    const [pmTodayOrder]: any = await conn.execute(
+      `SELECT paymentMethod, COALESCE(SUM(total),0) as r, COUNT(*) as c FROM \`Order\`
+       WHERE status NOT IN ('CANCELLED','RETURNED') AND createdAt>=? GROUP BY paymentMethod`, [todayStart]);
+    const [pmMonthOrder]: any = await conn.execute(
+      `SELECT paymentMethod, COALESCE(SUM(total),0) as r, COUNT(*) as c FROM \`Order\`
+       WHERE status NOT IN ('CANCELLED','RETURNED') AND createdAt>=? GROUP BY paymentMethod`, [monthStart]);
+    const [pmTodaySpa]: any = await conn.execute(
+      `SELECT 'CASH' as paymentMethod, COALESCE(SUM(price),0) as r, COUNT(*) as c FROM Appointment
+       WHERE status NOT IN ('CANCELLED') AND createdAt>=?`, [todayStart]);
+    const [pmMonthSpa]: any = await conn.execute(
+      `SELECT 'CASH' as paymentMethod, COALESCE(SUM(price),0) as r, COUNT(*) as c FROM Appointment
+       WHERE status NOT IN ('CANCELLED') AND createdAt>=?`, [monthStart]);
+    const todayPM = { CASH: { r: 0, c: 0 }, BANK_TRANSFER: { r: 0, c: 0 } } as Record<string, {r:number,c:number}>;
+    const monthPM = { CASH: { r: 0, c: 0 }, BANK_TRANSFER: { r: 0, c: 0 } } as Record<string, {r:number,c:number}>;
+    for (const row of [...pmTodayOrder, ...pmTodaySpa]) {
+      if (!todayPM[row.paymentMethod]) todayPM[row.paymentMethod] = { r: 0, c: 0 };
+      todayPM[row.paymentMethod].r += Number(row.r); todayPM[row.paymentMethod].c += Number(row.c);
+    }
+    for (const row of [...pmMonthOrder, ...pmMonthSpa]) {
+      if (!monthPM[row.paymentMethod]) monthPM[row.paymentMethod] = { r: 0, c: 0 };
+      monthPM[row.paymentMethod].r += Number(row.r); monthPM[row.paymentMethod].c += Number(row.c);
+    }
 
     // ─── REVENUE CHART (7 ngày) ───────────────────────────────
     const revenueChart = [];
@@ -96,21 +128,41 @@ export async function GET(req: NextRequest) {
       let orderQuery = "";
       let spaQuery = "";
       if (reportType === "day") {
-        orderQuery = `SELECT DATE_FORMAT(createdAt,'${dateFormat}') as label, DATE(createdAt) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE(createdAt) ORDER BY period ASC`;
-        spaQuery = `SELECT DATE_FORMAT(createdAt,'${dateFormat}') as label, DATE(createdAt) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE(createdAt) ORDER BY period ASC`;
+        orderQuery = `SELECT DATE_FORMAT(createdAt,'${dateFormat}') as label, DATE(createdAt) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE(createdAt), DATE_FORMAT(createdAt,'${dateFormat}') ORDER BY period ASC`;
+        spaQuery = `SELECT DATE_FORMAT(createdAt,'${dateFormat}') as label, DATE(createdAt) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE(createdAt), DATE_FORMAT(createdAt,'${dateFormat}') ORDER BY period ASC`;
       } else if (reportType === "week") {
-        orderQuery = `SELECT CONCAT('T',WEEK(createdAt,1)) as label, YEARWEEK(createdAt,1) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEARWEEK(createdAt,1) ORDER BY period ASC`;
-        spaQuery = `SELECT CONCAT('T',WEEK(createdAt,1)) as label, YEARWEEK(createdAt,1) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEARWEEK(createdAt,1) ORDER BY period ASC`;
+        orderQuery = `SELECT CONCAT('T',WEEK(createdAt,1)) as label, YEARWEEK(createdAt,1) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEARWEEK(createdAt,1), CONCAT('T',WEEK(createdAt,1)) ORDER BY period ASC`;
+        spaQuery = `SELECT CONCAT('T',WEEK(createdAt,1)) as label, YEARWEEK(createdAt,1) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEARWEEK(createdAt,1), CONCAT('T',WEEK(createdAt,1)) ORDER BY period ASC`;
       } else if (reportType === "month") {
-        orderQuery = `SELECT DATE_FORMAT(createdAt,'%m/%Y') as label, DATE_FORMAT(createdAt,'%Y-%m') as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE_FORMAT(createdAt,'%Y-%m') ORDER BY period ASC`;
-        spaQuery = `SELECT DATE_FORMAT(createdAt,'%m/%Y') as label, DATE_FORMAT(createdAt,'%Y-%m') as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE_FORMAT(createdAt,'%Y-%m') ORDER BY period ASC`;
+        orderQuery = `SELECT DATE_FORMAT(createdAt,'%m/%Y') as label, DATE_FORMAT(createdAt,'%Y-%m') as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE_FORMAT(createdAt,'%Y-%m'), DATE_FORMAT(createdAt,'%m/%Y') ORDER BY period ASC`;
+        spaQuery = `SELECT DATE_FORMAT(createdAt,'%m/%Y') as label, DATE_FORMAT(createdAt,'%Y-%m') as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY DATE_FORMAT(createdAt,'%Y-%m'), DATE_FORMAT(createdAt,'%m/%Y') ORDER BY period ASC`;
       } else {
-        orderQuery = `SELECT YEAR(createdAt) as label, YEAR(createdAt) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEAR(createdAt) ORDER BY period ASC`;
-        spaQuery = `SELECT YEAR(createdAt) as label, YEAR(createdAt) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEAR(createdAt) ORDER BY period ASC`;
+        orderQuery = `SELECT YEAR(createdAt) as label, YEAR(createdAt) as period, COALESCE(SUM(total),0) as revenue, COUNT(*) as count FROM \`Order\` WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEAR(createdAt), YEAR(createdAt) ORDER BY period ASC`;
+        spaQuery = `SELECT YEAR(createdAt) as label, YEAR(createdAt) as period, COALESCE(SUM(price),0) as revenue, COUNT(*) as count FROM Appointment WHERE status='COMPLETED' AND createdAt BETWEEN ? AND ? GROUP BY YEAR(createdAt), YEAR(createdAt) ORDER BY period ASC`;
       }
 
       const [orderRevData]: any = await conn.execute(orderQuery, [rangeStart, rangeEnd]);
       const [spaRevData]: any = await conn.execute(spaQuery, [rangeStart, rangeEnd]);
+
+      // Payment method breakdown for the period (tất cả trừ hủy/hoàn)
+      const [pmBreakdownOrder]: any = await conn.execute(
+        `SELECT paymentMethod, COALESCE(SUM(total),0) as revenue, COUNT(*) as count
+         FROM \`Order\` WHERE status NOT IN ('CANCELLED','RETURNED') AND createdAt BETWEEN ? AND ?
+         GROUP BY paymentMethod`, [rangeStart, rangeEnd]);
+      const [pmBreakdownSpa]: any = await conn.execute(
+        `SELECT 'CASH' as paymentMethod, COALESCE(SUM(price),0) as revenue, COUNT(*) as count
+         FROM Appointment WHERE status NOT IN ('CANCELLED') AND createdAt BETWEEN ? AND ?`,
+        [rangeStart, rangeEnd]);
+      const pmAgg: Record<string, {revenue:number,count:number}> = { CASH:{revenue:0,count:0}, BANK_TRANSFER:{revenue:0,count:0} };
+      for (const r of [...pmBreakdownOrder, ...pmBreakdownSpa]) {
+        if (!pmAgg[r.paymentMethod]) pmAgg[r.paymentMethod] = {revenue:0,count:0};
+        pmAgg[r.paymentMethod].revenue += Number(r.revenue);
+        pmAgg[r.paymentMethod].count += Number(r.count);
+      }
+      const pmSummary = {
+        cashRevenue: pmAgg.CASH.revenue, cashCount: pmAgg.CASH.count,
+        bankRevenue: pmAgg.BANK_TRANSFER.revenue, bankCount: pmAgg.BANK_TRANSFER.count,
+      };
 
       // Merge by label
       const merged: Record<string, any> = {};
@@ -134,7 +186,7 @@ export async function GET(req: NextRequest) {
       const totalOrderCount = chartData.reduce((s: number, r: any) => s + r.orderCount, 0);
       const totalSpaCount = chartData.reduce((s: number, r: any) => s + r.spaCount, 0);
 
-      reportData = { chartData, totalOrderRev, totalSpaRev, totalRev: totalOrderRev + totalSpaRev, totalOrderCount, totalSpaCount };
+      reportData = { chartData, totalOrderRev, totalSpaRev, totalRev: totalOrderRev + totalSpaRev, totalOrderCount, totalSpaCount, pmSummary };
     }
 
     // ─── TOP PRODUCTS ─────────────────────────────────────────
@@ -173,8 +225,17 @@ export async function GET(req: NextRequest) {
         totalOrders: Number(totalOrders[0].c),
         shippingOrders: Number(shippingOrders[0].c),
         returnedOrders: Number(returnedOrders[0].c),
+        cancelledOrders: Number(cancelledOrders[0].c),
+        returnedRevMonth: Number(returnedRevMonth[0].r),
+        returnedRevToday: Number(returnedRevToday[0].r),
+        netMonthRevenue: Number(monthOrders[0].r) + Number(monthSpa[0].r) - Number(returnedRevMonth[0].r),
+        netTodayRevenue: Number(todayOrders[0].r) + Number(todaySpa[0].r) - Number(returnedRevToday[0].r),
         newCustomers: Number(newCustomers[0].c),
         todaySpaCount: Number(todaySpaCount[0].c),
+        todayCashRevenue: todayPM.CASH.r, todayCashCount: todayPM.CASH.c,
+        todayBankRevenue: todayPM.BANK_TRANSFER.r, todayBankCount: todayPM.BANK_TRANSFER.c,
+        monthCashRevenue: monthPM.CASH.r, monthCashCount: monthPM.CASH.c,
+        monthBankRevenue: monthPM.BANK_TRANSFER.r, monthBankCount: monthPM.BANK_TRANSFER.c,
         revenueChart,
         reportData,
         topProducts,

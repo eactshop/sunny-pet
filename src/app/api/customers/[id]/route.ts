@@ -18,7 +18,18 @@ export async function GET(req: NextRequest, context: any) {
   const conn = await mysql.createConnection(process.env.DATABASE_URL || "mysql://root:@localhost:3306/sunny_pet");
   try {
     const { id } = await context.params;
-    const [rows]: any = await conn.execute("SELECT * FROM Customer WHERE id = ?", [id]);
+    const [rows]: any = await conn.execute(
+      `SELECT c.*,
+        COUNT(DISTINCT p.id) as petCount,
+        COUNT(DISTINCT CASE WHEN a.status='COMPLETED' THEN a.id END) as spaCount,
+        COUNT(DISTINCT o.id) as totalOrders,
+        COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total ELSE 0 END),0) as totalSpent
+       FROM Customer c
+       LEFT JOIN Pet p ON p.customerId = c.id
+       LEFT JOIN Appointment a ON a.customerId = c.id
+       LEFT JOIN \`Order\` o ON o.customerId = c.id
+       WHERE c.id=? GROUP BY c.id`, [id]
+    );
     if (!rows.length) { await conn.end(); return NextResponse.json({ success: false, error: "Không tìm thấy" }, { status: 404 }); }
     const [pets]: any = await conn.execute("SELECT * FROM Pet WHERE customerId = ? ORDER BY createdAt DESC", [id]);
     const [orders]: any = await conn.execute(
