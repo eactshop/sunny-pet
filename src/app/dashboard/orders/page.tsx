@@ -39,7 +39,7 @@ interface OrderItem {
   productCode: string; quantity: number; price: number; subtotal: number;
 }
 interface Customer { id: string; name: string; phone: string; }
-interface Product { id: string; code: string; name: string; sellPrice: number; stock: number; }
+interface Product { id: string; code: string; name: string; sellPrice: number; salePrice?: number; stock: number; }
 
 function printInvoice(order: Order, customerName: string, customerPhone: string) {
   const win = window.open("", "_blank", "width=800,height=600");
@@ -177,11 +177,14 @@ export default function OrdersPage() {
 
   const addProduct = (p: Product) => {
     if (p.stock === 0) return;
+    const saleP = Number(p.salePrice);
+    const sellP = Number(p.sellPrice);
+    const activePrice = saleP > 0 && saleP < sellP ? saleP : sellP;
     const existing = orderItems.find(i => i.productId === p.id);
     if (existing) {
       setOrderItems(prev => prev.map(i => i.productId === p.id && i.quantity < i.stock ? { ...i, quantity: i.quantity + 1 } : i));
     } else {
-      setOrderItems(prev => [...prev, { productId: p.id, name: p.name, code: p.code, quantity: 1, price: p.sellPrice, stock: p.stock }]);
+      setOrderItems(prev => [...prev, { productId: p.id, name: p.name, code: p.code, quantity: 1, price: activePrice, stock: p.stock }]);
     }
   };
 
@@ -478,7 +481,14 @@ export default function OrdersPage() {
                           <span style={{ fontSize: 13, marginLeft: 6 }}>{p.name}</span>
                         </div>
                         <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#4CAF50" }}>{fmt(p.sellPrice)}</div>
+                          {Number(p.salePrice) > 0 && Number(p.salePrice) < Number(p.sellPrice) ? (
+                            <>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#E53935" }}>{fmt(Number(p.salePrice))}</div>
+                              <div style={{ fontSize: 10, color: "#aaa", textDecoration: "line-through" }}>{fmt(Number(p.sellPrice))}</div>
+                            </>
+                          ) : (
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#4CAF50" }}>{fmt(Number(p.sellPrice))}</div>
+                          )}
                           <div style={{ fontSize: 10, color: "#888" }}>Tồn: {p.stock}</div>
                         </div>
                       </div>
