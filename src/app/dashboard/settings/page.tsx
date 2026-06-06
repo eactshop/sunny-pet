@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface Banner {
@@ -48,7 +48,6 @@ export default function SettingsPage() {
   const [bannerForm, setBannerForm] = useState({ imageUrl: "", title: "", link: "", order: "0", active: true });
   const [showAddBanner, setShowAddBanner] = useState(false);
   const [editBanner, setEditBanner] = useState<Banner | null>(null);
-  const bannerFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => { if (d.success) setCurrentUser(d.data); });
@@ -559,9 +558,7 @@ export default function SettingsPage() {
               {/* Image upload */}
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
-                <div
-                  onClick={() => bannerFileRef.current?.click()}
-                  style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, position: "relative", overflow: "hidden" }}>
+                <label htmlFor="banner-file-add" style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
                   {bannerForm.imageUrl ? (
                     <img src={bannerForm.imageUrl} alt="" style={{ maxHeight: 160, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
                   ) : bannerUploading ? (
@@ -573,8 +570,8 @@ export default function SettingsPage() {
                       <div style={{ fontSize: 11, color: "#aaa" }}>Khuyến nghị: 1200×400px hoặc tỷ lệ 3:1</div>
                     </>
                   )}
-                </div>
-                <input ref={bannerFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                </label>
+                <input id="banner-file-add" type="file" accept="image/*" style={{ display: "none" }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
               </div>
               {/* Title */}
@@ -623,8 +620,7 @@ export default function SettingsPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "#444", display: "block", marginBottom: 8 }}>Ảnh banner *</label>
-                <div onClick={() => bannerFileRef.current?.click()}
-                  style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
+                <label htmlFor="banner-file-edit" style={{ border: "2px dashed #F4B400", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", background: "#FFFDE7", minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, overflow: "hidden" }}>
                   {editBanner.imageUrl ? (
                     <img src={editBanner.imageUrl} alt="" style={{ maxHeight: 140, maxWidth: "100%", borderRadius: 8, objectFit: "contain" }} />
                   ) : bannerUploading ? (
@@ -632,8 +628,8 @@ export default function SettingsPage() {
                   ) : (
                     <div style={{ fontSize: 13, color: "#888" }}>📤 Click để đổi ảnh</div>
                   )}
-                </div>
-                <input ref={bannerFileRef} type="file" accept="image/*" style={{ display: "none" }}
+                </label>
+                <input id="banner-file-edit" type="file" accept="image/*" style={{ display: "none" }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); e.target.value = ""; }} />
               </div>
               <div>
