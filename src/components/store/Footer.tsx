@@ -67,15 +67,15 @@ export default function Footer() {
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-[#F4B400] shrink-0 mt-0.5" />
-                <span>123 Đường Thú Cưng, Quận 1, TP.HCM</span>
+                <span>271 Ngõ Chợ Khâm Thiên</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#F4B400] shrink-0" />
-                <a href="tel:1800SUNNY" className="hover:text-[#F4B400] transition-colors">1800-SUNNY</a>
+                <a href="tel:0828599626" className="hover:text-[#F4B400] transition-colors">0828.599.626</a>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#F4B400] shrink-0" />
-                <a href="mailto:hello@sunnypet.vn" className="hover:text-[#F4B400] transition-colors">hello@sunnypet.vn</a>
+                <a href="mailto:sunypet@gmail.com" className="hover:text-[#F4B400] transition-colors">sunypet@gmail.com</a>
               </li>
             </ul>
             <div className="mt-4 p-3 bg-gray-800 rounded-lg text-xs text-gray-400">

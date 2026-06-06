@@ -39,7 +39,7 @@ export default function Header() {
       <header className="sticky top-0 z-40 bg-white shadow-sm border-b border-gray-100">
         {/* Top bar */}
         <div className="bg-[#F4B400] text-white text-xs py-1 text-center">
-          Miễn phí vận chuyển đơn hàng trên 300.000đ &nbsp;|&nbsp; Hotline: 1800-SUNNY
+          Miễn phí vận chuyển đơn hàng trên 300.000đ &nbsp;|&nbsp; Hotline: 0828.599.626
         </div>
 
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
