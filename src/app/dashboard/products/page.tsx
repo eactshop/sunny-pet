@@ -145,7 +145,8 @@ export default function ProductsPage() {
   const saleP = Number(form.salePrice);
   const buyP = Number(form.buyPrice);
   const discount = form.salePrice && saleP > 0 ? pct(saleP, sellP) : 0;
-  const profit = form.salePrice && saleP > 0 ? saleP - buyP : sellP - buyP;
+  const activeSellPrice = form.salePrice && saleP > 0 ? saleP : sellP;
+  const profit = activeSellPrice - buyP;
 
   return (
     <div>
@@ -379,7 +380,7 @@ export default function ProductsPage() {
                       </span>
                     )}
                     <span style={{ background: "#E8F5E9", color: "#2E7D32", padding: "4px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
-                      💵 Lãi: {fmt(profit)} ({Math.round(profit / buyP * 100)}%)
+                      💵 Lãi: {fmt(profit)} ({Math.round(profit / activeSellPrice * 100)}%)
                     </span>
                   </div>
                 )}
