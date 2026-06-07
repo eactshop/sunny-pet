@@ -105,6 +105,18 @@ export async function GET(req: NextRequest) {
     const totalSpaCount = chartData.reduce((s, r) => s + r.spaCount, 0);
     const totalSpaCompleted = chartData.reduce((s, r) => s + r.spaCompleted, 0);
 
+    // Cost of goods sold (for profit calculation)
+    const [costRows]: any = await conn.execute(
+      `SELECT COALESCE(SUM(oi.quantity * p.buyPrice), 0) as costOfGoods
+       FROM OrderItem oi
+       LEFT JOIN \`Order\` o ON oi.orderId = o.id
+       LEFT JOIN Product p ON oi.productId = p.id
+       WHERE o.status = 'COMPLETED' AND o.createdAt BETWEEN ? AND ?`,
+      [rangeStart, rangeEnd]
+    );
+    const totalCostOfGoods = Number(costRows[0]?.costOfGoods || 0);
+    const totalProfit = totalNetRev - totalCostOfGoods;
+
     // Top products
     const [topProducts]: any = await conn.execute(
       `SELECT p.id, p.name, p.code, c.name as categoryName,
@@ -178,6 +190,8 @@ export async function GET(req: NextRequest) {
         summary: {
           totalRevenue: totalOrderRev + totalSpaRev,
           totalReturnedRev, totalCancelledRev, totalNetRev,
+          totalCostOfGoods, totalProfit,
+          profitMargin: totalNetRev > 0 ? Math.round(totalProfit / totalNetRev * 100) : 0,
           totalOrderRev, totalSpaRev,
           totalOrderCount, totalOrderCompleted, totalOrderReturned, totalOrderCancelled,
           totalSpaCount, totalSpaCompleted,

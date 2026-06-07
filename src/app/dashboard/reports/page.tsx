@@ -129,6 +129,7 @@ export default function ReportsPage() {
               { icon: "↩️", label: "Doanh thu hoàn hàng", value: fmt(s.totalReturnedRev || 0), sub: `${s.totalOrderReturned} đơn hoàn`, color: "#FF7043" },
               { icon: "❌", label: "Doanh thu đơn hủy", value: fmt(s.totalCancelledRev || 0), sub: `${s.totalOrderCancelled} đơn hủy`, color: "#EF5350" },
               { icon: "✅", label: "Doanh thu thực (NET)", value: fmt(s.totalNetRev || 0), sub: `Sau trừ hoàn hàng`, color: "#2E7D32", highlight: true },
+              { icon: "💎", label: "Lợi nhuận", value: fmt(s.totalProfit || 0), sub: `Biên LN ${s.profitMargin || 0}% · Vốn ${fmt(s.totalCostOfGoods || 0)}`, color: "#7B1FA2", highlight: true },
             ].map(c => (
               <div key={c.label} style={{ background: (c as any).highlight ? "#E8F5E9" : "#fff", borderRadius: 14, padding: "16px 18px", boxShadow: "0 2px 8px rgba(0,0,0,0.07)", borderLeft: `4px solid ${c.color}`, display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 24 }}>{c.icon}</span>
